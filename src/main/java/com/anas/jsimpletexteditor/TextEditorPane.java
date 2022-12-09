@@ -7,7 +7,7 @@ import com.anas.jsimpletexteditor.settings.SettingsListener;
 import com.anas.jsimpletexteditor.settings.SettingsManager;
 
 import javax.swing.*;
-import java.awt.*;
+//import java.awt.*;
 import java.io.Serial;
 import java.io.Serializable;
 

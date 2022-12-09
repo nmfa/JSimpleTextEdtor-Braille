@@ -1,6 +1,6 @@
 package com.anas.jsimpletexteditor.settings.categories;
 
-import net.miginfocom.swing.MigLayout;
+//import net.miginfocom.swing.MigLayout;
 
 import javax.swing.*;
 import java.awt.*;

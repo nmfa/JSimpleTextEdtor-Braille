@@ -1,7 +1,7 @@
 package com.anas.jsimpletexteditor.buttons.newtab;
 
 import com.anas.jsimpletexteditor.TabbedPane;
-import net.miginfocom.swing.MigLayout;
+//import net.miginfocom.swing.MigLayout;
 
 import javax.swing.*;
 import javax.swing.plaf.basic.BasicButtonUI;

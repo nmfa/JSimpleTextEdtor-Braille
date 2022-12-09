@@ -41,6 +41,7 @@ public class TextFile extends File {
             if (stringBuilder.length() > 0) {
                 stringBuilder.deleteCharAt(stringBuilder.lastIndexOf("\n")); // Delete last new line
             }
+            bufferedReader.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

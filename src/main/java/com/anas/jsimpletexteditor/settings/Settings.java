@@ -57,12 +57,12 @@ public abstract class Settings implements Serializable {
     }
 
     public void setFontStyle(int fontStyle) {
-        int style = switch (fontStyle) {
+        /*int style = switch (fontStyle) {
             case 1 -> Font.BOLD;
             case 2 -> Font.ITALIC;
             case 3 -> Font.BOLD + Font.ITALIC;
             default -> Font.PLAIN;
-        };
+        };*/
         this.setFont(new Font(font.getFamily(), fontStyle, font.getSize()));
     }
 
