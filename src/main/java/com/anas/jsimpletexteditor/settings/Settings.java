@@ -13,9 +13,9 @@ public abstract class Settings implements Serializable {
     private Color backgroundColor, textColor;
 
     public Settings() {
-        font = new Font(Font.SANS_SERIF, Font.PLAIN, 16);
-        backgroundColor = Color.WHITE;
-        textColor = Color.BLACK;
+        font = new Font(Font.SANS_SERIF, Font.BOLD, 20);
+        backgroundColor = Color.BLACK;
+        textColor = Color.WHITE;
     }
 
     public Settings(Settings settings) {
