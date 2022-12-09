@@ -14,7 +14,7 @@ import java.io.Serializable;
 public class TextEditorPane extends JScrollPane implements Serializable, SettingsListener {
     @Serial
     private static final long serialVersionUID = 1L;
-    private JTextArea textArea;
+    private TextAreaBraille textArea;
     private TextFile textFile;
 
     public TextEditorPane(TextFile textFile) {
@@ -53,7 +53,7 @@ public class TextEditorPane extends JScrollPane implements Serializable, Setting
     }
 
     private void init() {
-        textArea = new JTextArea();
+        textArea = new TextAreaBraille();
     }
 
     public void setTextFile(TextFile textFile) {
