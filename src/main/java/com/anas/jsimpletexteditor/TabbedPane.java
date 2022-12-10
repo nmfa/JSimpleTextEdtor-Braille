@@ -17,6 +17,7 @@ public class TabbedPane extends JTabbedPane {
         super();
         this.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
         this.addNewTabButton();
+        this.openNewTab(new TextFile("Untitled.txt"));
     }
 
     public void openNewTab(TextFile textFile) {
