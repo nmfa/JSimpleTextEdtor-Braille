@@ -1,5 +1,6 @@
 package com.anas.jsimpletexteditor;
 
+import java.awt.Component;
 import java.awt.event.KeyEvent;
 import java.util.HashMap;
 import java.util.logging.Logger;
@@ -38,12 +39,19 @@ public class TextAreaBraille extends JTextArea {
         if (e.getID() == KeyEvent.KEY_PRESSED) {
             keyDown = true;
 			log.info("KEYDOWN: " + e.getKeyChar() + ", " + e.getKeyCode());
+
+			// Ignore Space
+			if (e.getKeyCode() == 32) {
+				return;
+			}
         } else if (e.getID() == KeyEvent.KEY_RELEASED) {
             keyDown = false;
 			log.info("KEYUP: " + e.getKeyChar() + ", " + e.getKeyCode());
 
 			// Space will just get passed through.
-			
+			if (e.getKeyCode() == 32) {
+				sendKeyEvents(e.getComponent(), e. getWhen(), brailleMap.get(-32));
+			}
         } else {
             // Ignore
             return;
@@ -52,28 +60,7 @@ public class TextAreaBraille extends JTextArea {
 
         // If keyUp then we send what we currently have.
         if (keyUp && lastKeyDown && brailleMap.containsKey(currentPins)) {
-			log.info("PROCESS: " +  brailleMap.get(currentPins).keyChar + ", " + brailleMap.get(currentPins).keyCode);
-            KeyEvent newE = new KeyEvent(e.getComponent(),
-                                         KeyEvent.KEY_PRESSED,
-                                         e.getWhen(),
-                                         0,
-                                         brailleMap.get(currentPins).keyCode,
-                                         brailleMap.get(currentPins).keyChar);
-            super.processKeyEvent(newE);
-            newE = new KeyEvent(e.getComponent(),
-                            	KeyEvent.KEY_TYPED,
-                                e.getWhen(),
-                                0,
-                                KeyEvent.VK_UNDEFINED,
-                                brailleMap.get(currentPins).keyChar);
-            super.processKeyEvent(newE);
-            newE = new KeyEvent(e.getComponent(),
-                                KeyEvent.KEY_RELEASED,
-                                e.getWhen(),
-                                0,
-                                brailleMap.get(currentPins).keyCode,
-                                brailleMap.get(currentPins).keyChar);
-			super.processKeyEvent(newE);
+			sendKeyEvents(e.getComponent(), e.getWhen(), brailleMap.get(currentPins));
 		}
 
         Integer pin = keyPinMap.get(e.getKeyCode());
@@ -90,6 +77,32 @@ public class TextAreaBraille extends JTextArea {
 
         //super.processKeyEvent(e);
     }
+
+
+	private void sendKeyEvents(Component c, long when, KeyData kd) {
+		log.info("SEND KEYEVENTS: " + kd.keyChar + ", " + kd.keyCode);
+		KeyEvent newE = new KeyEvent(c,
+									 KeyEvent.KEY_PRESSED,
+									 when,
+									 0,
+									 kd.keyCode,
+									 kd.keyChar);
+		super.processKeyEvent(newE);
+		newE = new KeyEvent(c,
+							KeyEvent.KEY_TYPED,
+							when,
+							0,
+							KeyEvent.VK_UNDEFINED,
+							kd.keyChar);
+		super.processKeyEvent(newE);
+		newE = new KeyEvent(c,
+							KeyEvent.KEY_RELEASED,
+							when,
+							0,
+							kd.keyCode,
+							kd.keyChar);
+		super.processKeyEvent(newE);
+	}
 
 
     private void  populateBrailleMaps() {
@@ -119,6 +132,9 @@ public class TextAreaBraille extends JTextArea {
         brailleMap.put(45, new KeyData('x'));
         brailleMap.put(61, new KeyData('y'));
         brailleMap.put(53, new KeyData('z'));
+
+		// ASCII CHARACTERS. Stored under the negative iof their keycode.
+        brailleMap.put(-32, new KeyData(' '));
 
         keyPinMap.put(70, 1);   // F
         keyPinMap.put(68, 2);   // D
