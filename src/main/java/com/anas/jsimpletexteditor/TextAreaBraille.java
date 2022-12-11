@@ -27,6 +27,7 @@ public class TextAreaBraille extends JTextArea {
 
     private int currentPins = 0;
     private boolean lastKeyDown = false;
+	private int shift = 0; // 0 = no shift, 1 = normal, 2 = word, 3 = Caps Lock
 
     TextAreaBraille() {
         super();
@@ -51,6 +52,15 @@ public class TextAreaBraille extends JTextArea {
 			// Space will just get passed through.
 			if (e.getKeyCode() == 32) {
 				sendKeyEvents(e.getComponent(), e. getWhen(), brailleMap.get(-32));
+				if (shift < 3) shift = 0;
+			}
+
+			// Shift
+			if (currentPins == 32) {
+				shift++;
+				if (shift > 3) shift = 0;
+				currentPins = 0;
+				return;
 			}
         } else {
             // Ignore
@@ -61,6 +71,7 @@ public class TextAreaBraille extends JTextArea {
         // If keyUp then we send what we currently have.
         if (keyUp && lastKeyDown && brailleMap.containsKey(currentPins)) {
 			sendKeyEvents(e.getComponent(), e.getWhen(), brailleMap.get(currentPins));
+			if (shift == 1) shift = 0;
 		}
 
         Integer pin = keyPinMap.get(e.getKeyCode());
@@ -80,27 +91,34 @@ public class TextAreaBraille extends JTextArea {
 
 
 	private void sendKeyEvents(Component c, long when, KeyData kd) {
+		char keyChar = kd.keyChar; // So that we don't alter the KeyData value in the map.
+		int modifiers = 0;
+		if (shift > 0) {
+			modifiers = KeyEvent.SHIFT_DOWN_MASK;
+			keyChar = Character.toUpperCase(keyChar);
+		}
+
 		log.info("SEND KEYEVENTS: " + kd.keyChar + ", " + kd.keyCode);
 		KeyEvent newE = new KeyEvent(c,
 									 KeyEvent.KEY_PRESSED,
 									 when,
-									 0,
+									 modifiers,
 									 kd.keyCode,
-									 kd.keyChar);
+									 keyChar);
 		super.processKeyEvent(newE);
 		newE = new KeyEvent(c,
 							KeyEvent.KEY_TYPED,
 							when,
-							0,
+							modifiers,
 							KeyEvent.VK_UNDEFINED,
-							kd.keyChar);
+							keyChar);
 		super.processKeyEvent(newE);
 		newE = new KeyEvent(c,
 							KeyEvent.KEY_RELEASED,
 							when,
-							0,
+							modifiers,
 							kd.keyCode,
-							kd.keyChar);
+							keyChar);
 		super.processKeyEvent(newE);
 	}
 
@@ -133,7 +151,7 @@ public class TextAreaBraille extends JTextArea {
         brailleMap.put(61, new KeyData('y'));
         brailleMap.put(53, new KeyData('z'));
 
-		// ASCII CHARACTERS. Stored under the negative iof their keycode.
+		// ASCII CHARACTERS. Stored under the negative of their keycode.
         brailleMap.put(-32, new KeyData(' '));
 
         keyPinMap.put(70, 1);   // F
