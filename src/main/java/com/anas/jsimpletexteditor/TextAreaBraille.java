@@ -15,6 +15,11 @@ class KeyData {
         keyChar = ch;
         keyCode = (int)Character.toUpperCase(keyChar);
     }
+
+	KeyData(char ch, int co) {
+		keyChar = ch;
+		keyCode = co;
+	}
 }
 
 
@@ -41,18 +46,23 @@ public class TextAreaBraille extends JTextArea {
             keyDown = true;
 			log.info("KEYDOWN: " + e.getKeyChar() + ", " + e.getKeyCode());
 
-			// Ignore Space
-			if (e.getKeyCode() == 32) {
-				return;
+			// Ignore for keyDown
+			switch (e.getKeyCode()) {
+				case KeyEvent.VK_ENTER:
+				case KeyEvent.VK_SPACE:
+					return;
 			}
         } else if (e.getID() == KeyEvent.KEY_RELEASED) {
             keyDown = false;
 			log.info("KEYUP: " + e.getKeyChar() + ", " + e.getKeyCode());
 
-			// Space will just get passed through.
-			if (e.getKeyCode() == 32) {
-				sendKeyEvents(e.getComponent(), e. getWhen(), brailleMap.get(-32));
-				if (shift < 3) shift = 0;
+			// Pass through. Reset shift below Caps Lock (3) for white space.
+			int keyCode = e.getKeyCode();
+			switch (keyCode) {
+				case KeyEvent.VK_ENTER:
+				case KeyEvent.VK_SPACE:
+					sendKeyEvents(e.getComponent(), e. getWhen(), brailleMap.get(-keyCode));
+					if (shift < 3) shift = 0;
 			}
 
 			// Shift
@@ -150,9 +160,11 @@ public class TextAreaBraille extends JTextArea {
         brailleMap.put(45, new KeyData('x'));
         brailleMap.put(61, new KeyData('y'));
         brailleMap.put(53, new KeyData('z'));
+        brailleMap.put(128, new KeyData('\n', KeyEvent.VK_ENTER));
 
 		// ASCII CHARACTERS. Stored under the negative of their keycode.
-        brailleMap.put(-32, new KeyData(' '));
+        brailleMap.put(-KeyEvent.VK_ENTER, brailleMap.get(128));
+        brailleMap.put(-KeyEvent.VK_SPACE, new KeyData(' ', KeyEvent.VK_SPACE));
 
         keyPinMap.put(70, 1);   // F
         keyPinMap.put(68, 2);   // D
