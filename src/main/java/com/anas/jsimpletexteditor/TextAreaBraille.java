@@ -207,10 +207,7 @@ public class TextAreaBraille extends JTextArea {
         addToBrailleMap(Y, new KeyData('y'));
         addToBrailleMap(Z, new KeyData('z'));
         addToBrailleMap(ENTER, new KeyData('\n', KeyEvent.VK_ENTER));
-
-		// SIMPLE PUNCTUATION
-
-
+	
 		// NUMBERS
 		// WITH NUMBER PREFiX
         numberMap.put(D0, new KeyData('0'));
@@ -246,6 +243,17 @@ public class TextAreaBraille extends JTextArea {
         addToBrailleMap(N8, numberMap.get(D8));
         addToBrailleMap(N9, numberMap.get(D9));
 
+		// SIMPLE PUNCTUATION
+		addToBrailleMap(APOSTROPHE, new KeyData('\''));
+		addToBrailleMap(COLON, new KeyData(':', KeyEvent.VK_COLON));
+		addToBrailleMap(COMMA, new KeyData(',', KeyEvent.VK_COMMA));
+		addToBrailleMap(EXCLAMATION, new KeyData('!', KeyEvent.VK_EXCLAMATION_MARK));
+		addToBrailleMap(FULLSTOP, new KeyData('.', KeyEvent.VK_PERIOD));
+		addToBrailleMap(MINUS, new KeyData('-', KeyEvent.VK_MINUS));
+		addToBrailleMap(QUESTION, new KeyData('?'));
+		addToBrailleMap(QUOTE, new KeyData('"'));
+		addToBrailleMap(SEMICOLON, new KeyData(';', KeyEvent.VK_SEMICOLON));
+
 
 		// ASCII CHARACTERS. Stored under the negative of their keycode.
         addToBrailleMap(-KeyEvent.VK_ENTER, brailleMap.get(ENTER));
@@ -261,6 +269,8 @@ public class TextAreaBraille extends JTextArea {
         keyPinMap.put(59, 128); // ;
     }
 
+	// PINCODES
+	// LETTERS
 	public static final int A = 1;
 	public static final int B = 3;
 	public static final int C = 9;
@@ -288,6 +298,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int Y = 61;
 	public static final int Z = 53;
 
+	// NUMBERS
 	public static final int N0 = 63;
 	public static final int N1 = 33;
 	public static final int N2 = 35;
@@ -309,6 +320,19 @@ public class TextAreaBraille extends JTextArea {
 	public static final int D9 = I;
 	public static final int D0 = J;
 
+	// PUNCTUATION
+	public static final int APOSTROPHE = 4;
+	public static final int COLON = 18;
+	public static final int COMMA = 2;
+	public static final int EXCLAMATION = 22;
+	public static final int FULLSTOP = 50;
+	public static final int HYPHEN = 36;
+	public static final int MINUS = 36;
+	public static final int QUESTION = 38;
+	public static final int QUOTE = 8;
+	public static final int SEMICOLON = 6;
+
+	// SPECIAL
 	public static final int DIGIT = 60;
 	public static final int ENTER = 128;
 	public static final int SHIFT = 32;
