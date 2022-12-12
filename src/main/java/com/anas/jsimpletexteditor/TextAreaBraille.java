@@ -26,12 +26,15 @@ class KeyData {
 
 
 public class TextAreaBraille extends JTextArea {
+	// pinCode, KeyData
     private HashMap<Integer, KeyData> brailleMap = new HashMap<Integer, KeyData>();
+	// pinCode, KeyData
     private HashMap<Integer, KeyData> numberMap = new HashMap<Integer, KeyData>();
+	// keyCode, pinCode bit
     private HashMap<Integer, Integer> keyPinMap = new HashMap<Integer, Integer>();
     Logger log = Logger.getLogger("TextAreaBraille");
 
-    private int currentPins = 0;
+    private int currentPinCode = 0;
     private boolean lastKeyDown = false;
 	private int shift = 0; // 0 = no shift, 1 = normal, 2 = word, 3 = Caps Lock
 	private int digit = 0; // 0 = not a digit, 1 = normal, 2 = word, 3 = Num Lock
@@ -72,19 +75,19 @@ public class TextAreaBraille extends JTextArea {
 			// Getting engaged when it's the last key left of a larger combination, so only after a keyDown
 			if (lastKeyDown) {
 				// Shift
-				if (currentPins == SHIFT) {
+				if (currentPinCode == SHIFT) {
 					shift++;
 					if (shift > 3) shift = 0;
 					if (digit == 1) digit = 0;
-					currentPins = 0;
+					currentPinCode = 0;
 					return;
 				}
 				// Number
-				if (currentPins == DIGIT) {
+				if (currentPinCode == DIGIT) {
 					digit++;
 					if (digit > 3) digit = 0;
 					if (shift == 1) shift = 0;
-					currentPins = ~(~currentPins | pin);;
+					currentPinCode = ~(~currentPinCode | pin);;
 					return;
 				}
 			}
@@ -95,24 +98,24 @@ public class TextAreaBraille extends JTextArea {
         boolean keyUp = !keyDown;
 
         // If keyUp then we send what we currently have.
-        if (keyUp && lastKeyDown && brailleMap.containsKey(currentPins)) {
-			sendKeyEvents(e.getComponent(), e.getWhen(), currentPins);
+        if (keyUp && lastKeyDown && brailleMap.containsKey(currentPinCode)) {
+			sendKeyEvents(e.getComponent(), e.getWhen(), currentPinCode);
 			if (shift == 1) shift = 0;
 			if (digit == 1) digit = 0;
 		}
 
-		if (currentPins == ENTER) {
+		if (currentPinCode == ENTER) {
 			if (shift < 3) shift = 0;
 			if (digit < 3) digit = 0;
 		}
 
 		if (pin != null) {
 			if (keyDown) {
-				currentPins = currentPins | pin;
+				currentPinCode = currentPinCode | pin;
 			} else {
-				currentPins = ~(~currentPins | pin);
+				currentPinCode = ~(~currentPinCode | pin);
 			}
-			//log.info("CURRENT PINS: " + currentPins);
+			//log.info("CURRENT PINS: " + currentPinCode);
 		}
 
         lastKeyDown = keyDown;
@@ -164,37 +167,53 @@ public class TextAreaBraille extends JTextArea {
 	}
 
 
+	private void addToBrailleMap(int pinCode, KeyData keyData) {
+		if (brailleMap.containsKey(pinCode)) {
+			log.severe("DUPLICATE KEYCODE MAP: "  + pinCode);
+			log.severe("    CURRENT: " + brailleMap.get(pinCode).keyChar);
+			log.severe("    DESIRED: " + keyData.keyChar);
+		} else { 
+			brailleMap.put(pinCode, keyData);
+		}
+	}
+
+
     private void  populateBrailleMaps() {
 		// LETTERS, PUNCTuATION
-        brailleMap.put(A, new KeyData('a'));
-        brailleMap.put(B, new KeyData('b'));
-        brailleMap.put(C, new KeyData('c'));
-        brailleMap.put(D, new KeyData('d'));
-        brailleMap.put(E, new KeyData('e'));
-        brailleMap.put(F, new KeyData('f'));
-        brailleMap.put(G, new KeyData('g'));
-        brailleMap.put(H, new KeyData('h'));
-        brailleMap.put(I, new KeyData('i'));
-        brailleMap.put(J, new KeyData('j'));
-        brailleMap.put(K, new KeyData('k'));
-        brailleMap.put(L, new KeyData('l'));
-        brailleMap.put(M, new KeyData('m'));
-        brailleMap.put(N, new KeyData('n'));
-        brailleMap.put(O, new KeyData('o'));
-        brailleMap.put(P, new KeyData('p'));
-        brailleMap.put(Q, new KeyData('q'));
-        brailleMap.put(R, new KeyData('r'));
-        brailleMap.put(S, new KeyData('s'));
-        brailleMap.put(T, new KeyData('t'));
-        brailleMap.put(U, new KeyData('u'));
-        brailleMap.put(V, new KeyData('v'));
-        brailleMap.put(W, new KeyData('w'));
-        brailleMap.put(X, new KeyData('x'));
-        brailleMap.put(Y, new KeyData('y'));
-        brailleMap.put(Z, new KeyData('z'));
-        brailleMap.put(ENTER, new KeyData('\n', KeyEvent.VK_ENTER));
+        addToBrailleMap(A, new KeyData('a'));
+        addToBrailleMap(B, new KeyData('b'));
+        addToBrailleMap(C, new KeyData('c'));
+        addToBrailleMap(D, new KeyData('d'));
+        addToBrailleMap(E, new KeyData('e'));
+        addToBrailleMap(F, new KeyData('f'));
+        addToBrailleMap(G, new KeyData('g'));
+        addToBrailleMap(H, new KeyData('h'));
+        addToBrailleMap(I, new KeyData('i'));
+        addToBrailleMap(J, new KeyData('j'));
+        addToBrailleMap(K, new KeyData('k'));
+        addToBrailleMap(L, new KeyData('l'));
+        addToBrailleMap(M, new KeyData('m'));
+        addToBrailleMap(N, new KeyData('n'));
+        addToBrailleMap(O, new KeyData('o'));
+        addToBrailleMap(P, new KeyData('p'));
+        addToBrailleMap(Q, new KeyData('q'));
+        addToBrailleMap(R, new KeyData('r'));
+        addToBrailleMap(S, new KeyData('s'));
+        addToBrailleMap(T, new KeyData('t'));
+        addToBrailleMap(U, new KeyData('u'));
+        addToBrailleMap(V, new KeyData('v'));
+        addToBrailleMap(W, new KeyData('w'));
+        addToBrailleMap(X, new KeyData('x'));
+        addToBrailleMap(Y, new KeyData('y'));
+        addToBrailleMap(Z, new KeyData('z'));
+        addToBrailleMap(ENTER, new KeyData('\n', KeyEvent.VK_ENTER));
+
+		// SIMPLE PUNCTUATION
+
 
 		// NUMBERS
+		// WITH NUMBER PREFiX
+        numberMap.put(D0, new KeyData('0'));
         numberMap.put(D1, new KeyData('1'));
         numberMap.put(D2, new KeyData('2'));
         numberMap.put(D3, new KeyData('3'));
@@ -204,11 +223,33 @@ public class TextAreaBraille extends JTextArea {
         numberMap.put(D7, new KeyData('7'));
         numberMap.put(D8, new KeyData('8'));
         numberMap.put(D9, new KeyData('9'));
-        numberMap.put(D0, new KeyData('0'));
+		// Duplicate in numberMap as we don't want to disable these if we use the digit prefix.
+        numberMap.put(N0, numberMap.get(D0));
+        numberMap.put(N1, numberMap.get(D1));
+        numberMap.put(N2, numberMap.get(D2));
+        numberMap.put(N3, numberMap.get(D3));
+        numberMap.put(N4, numberMap.get(D4));
+        numberMap.put(N5, numberMap.get(D5));
+        numberMap.put(N6, numberMap.get(D6));
+        numberMap.put(N7, numberMap.get(D7));
+        numberMap.put(N8, numberMap.get(D8));
+        numberMap.put(N9, numberMap.get(D9));
+		// COMPUTER NOTATION
+        addToBrailleMap(N0, numberMap.get(D0));
+        addToBrailleMap(N1, numberMap.get(D1));
+        addToBrailleMap(N2, numberMap.get(D2));
+        addToBrailleMap(N3, numberMap.get(D3));
+        addToBrailleMap(N4, numberMap.get(D4));
+        addToBrailleMap(N5, numberMap.get(D5));
+        addToBrailleMap(N6, numberMap.get(D6));
+        addToBrailleMap(N7, numberMap.get(D7));
+        addToBrailleMap(N8, numberMap.get(D8));
+        addToBrailleMap(N9, numberMap.get(D9));
+
 
 		// ASCII CHARACTERS. Stored under the negative of their keycode.
-        brailleMap.put(-KeyEvent.VK_ENTER, brailleMap.get(ENTER));
-        brailleMap.put(-KeyEvent.VK_SPACE, new KeyData(' ', KeyEvent.VK_SPACE));
+        addToBrailleMap(-KeyEvent.VK_ENTER, brailleMap.get(ENTER));
+        addToBrailleMap(-KeyEvent.VK_SPACE, new KeyData(' ', KeyEvent.VK_SPACE));
 
         keyPinMap.put(70, 1);   // F
         keyPinMap.put(68, 2);   // D
@@ -246,6 +287,17 @@ public class TextAreaBraille extends JTextArea {
 	public static final int X = 45;
 	public static final int Y = 61;
 	public static final int Z = 53;
+
+	public static final int N0 = 63;
+	public static final int N1 = 33;
+	public static final int N2 = 35;
+	public static final int N3 = 41;
+	public static final int N4 = 57;
+	public static final int N5 = 49;
+	public static final int N6 = 43;
+	public static final int N7 = 59;
+	public static final int N8 = 51;
+	public static final int N9 = 42;
 	public static final int D1 = A;
 	public static final int D2 = B;
 	public static final int D3 = C;
@@ -256,6 +308,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int D8 = H;
 	public static final int D9 = I;
 	public static final int D0 = J;
+
 	public static final int DIGIT = 60;
 	public static final int ENTER = 128;
 	public static final int SHIFT = 32;
