@@ -2,23 +2,61 @@ package com.anas.jsimpletexteditor;
 
 import java.awt.Component;
 import java.awt.event.KeyEvent;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.logging.Logger;
 import javax.swing.JTextArea;
 
 
+class MapData {
+	public ArrayList<KeyData> keyData;
+	public HashMap<Integer, MapData> map;
+    Logger log = Logger.getLogger("MapData");
+
+	MapData() {
+		keyData = null;
+		map = new HashMap<Integer, MapData>();
+	}
+
+	MapData(KeyData kd) {
+		keyData = new ArrayList<KeyData>(1);
+		keyData.add(kd);
+		map = null; // to be explicit
+	}
+
+	MapData(ArrayList<KeyData> kd) {
+		keyData = kd;
+		map = null;
+	}
+}
+
 class KeyData {
     public char keyChar;
     public int keyCode;
+	public int modifiers;
 
     KeyData(char ch) {
         keyChar = ch;
         keyCode = (int)Character.toUpperCase(keyChar);
+		modifiers = 0;
     }
 
-	KeyData(char ch, int co) {
+    KeyData(char ch, boolean sh) {
+        keyChar = ch;
+        keyCode = (int)Character.toUpperCase(keyChar);
+		modifiers = KeyEvent.SHIFT_DOWN_MASK;
+    }
+
+    KeyData(char ch, int co) {
+        keyChar = ch;
+        keyCode = co;
+		modifiers = 0;
+    }
+
+	KeyData(char ch, int co, boolean sh) {
 		keyChar = ch;
 		keyCode = co;
+		modifiers = KeyEvent.SHIFT_DOWN_MASK;
 	}
 }
 
@@ -26,15 +64,14 @@ class KeyData {
 
 
 public class TextAreaBraille extends JTextArea {
-	// pinCode, KeyData
-    private HashMap<Integer, KeyData> brailleMap = new HashMap<Integer, KeyData>();
-	// pinCode, KeyData
-    private HashMap<Integer, KeyData> numberMap = new HashMap<Integer, KeyData>();
+	// pinCode, MapData
+    private HashMap<Integer, MapData> brailleMap = new HashMap<Integer, MapData>();
 	// keyCode, pinCode bit
     private HashMap<Integer, Integer> keyPinMap = new HashMap<Integer, Integer>();
     Logger log = Logger.getLogger("TextAreaBraille");
 
     private int currentPinCode = 0;
+	private ArrayList<Integer> currentPinCodesList = new ArrayList<Integer>();
     private boolean lastKeyDown = false;
 	private int shift = 0; // 0 = no shift, 1 = normal, 2 = word, 3 = Caps Lock
 	private int digit = 0; // 0 = not a digit, 1 = normal, 2 = word, 3 = Num Lock
@@ -46,219 +83,329 @@ public class TextAreaBraille extends JTextArea {
 
     @Override
     protected void processKeyEvent(KeyEvent e) {
-		Integer pin = keyPinMap.get(e.getKeyCode());
-        boolean keyDown;
-        if (e.getID() == KeyEvent.KEY_PRESSED) {
-            keyDown = true;
-			//log.info("KEYDOWN: " + e.getKeyChar() + ", " + e.getKeyCode());
-
-			// Ignore for keyDown
-			switch (e.getKeyCode()) {
-				case KeyEvent.VK_ENTER:
-				case KeyEvent.VK_SPACE:
-					return;
-			}
+		log.info("PROCESS KEY EVENT: " + currentPinCode + ", " + currentPinCodesList.toString() + ", " + shift);
+		// Not setting lastKeyDown here, as it'll make the onKeyDown and onKeyUp logic consistent for when it is
+		// moved to an API which has those functions, rather than this single API function.
+		if (e.getID() == KeyEvent.KEY_PRESSED) {
+			onKeyDown(e);
         } else if (e.getID() == KeyEvent.KEY_RELEASED) {
-            keyDown = false;
-			//log.info("KEYUP: " + e.getKeyChar() + ", " + e.getKeyCode());
-
-			// Pass through. Reset shift below Caps Lock (3) for white space.
-			int keyCode = e.getKeyCode();
-			switch (keyCode) {
-				case KeyEvent.VK_ENTER:
-				case KeyEvent.VK_SPACE:
-					sendKeyEvents(e.getComponent(), e. getWhen(), -keyCode);
-					if (shift < 3) shift = 0;
-					if (digit < 3) digit = 0;
-			}
-
-			// Getting engaged when it's the last key left of a larger combination, so only after a keyDown
-			if (lastKeyDown) {
-				// Shift
-				if (currentPinCode == SHIFT) {
-					shift++;
-					if (shift > 3) shift = 0;
-					if (digit == 1) digit = 0;
-					currentPinCode = 0;
-					return;
-				}
-				// Number
-				if (currentPinCode == DIGIT) {
-					digit++;
-					if (digit > 3) digit = 0;
-					if (shift == 1) shift = 0;
-					currentPinCode = ~(~currentPinCode | pin);;
-					return;
-				}
-			}
+			onKeyUp(e);
         } else {
             // Ignore
             return;
         }
-        boolean keyUp = !keyDown;
-
-        // If keyUp then we send what we currently have.
-        if (keyUp && lastKeyDown && brailleMap.containsKey(currentPinCode)) {
-			sendKeyEvents(e.getComponent(), e.getWhen(), currentPinCode);
-			if (shift == 1) shift = 0;
-			if (digit == 1) digit = 0;
-		}
-
-		if (currentPinCode == ENTER) {
-			if (shift < 3) shift = 0;
-			if (digit < 3) digit = 0;
-		}
-
-		if (pin != null) {
-			if (keyDown) {
-				currentPinCode = currentPinCode | pin;
-			} else {
-				currentPinCode = ~(~currentPinCode | pin);
-			}
-			//log.info("CURRENT PINS: " + currentPinCode);
-		}
-
-        lastKeyDown = keyDown;
-
-        //super.processKeyEvent(e);
     }
 
 
-	private void sendKeyEvents(Component c, long when, int pins) {
-		KeyData kd = brailleMap.get(pins);
-		boolean whitespace = pins == ENTER || pins == SPACE;
-
-		// Ignore character if it isn't in A-J, unless whitespace
-		if (digit > 0 && !whitespace) {
-			if (!numberMap.containsKey(pins)) return;
-			kd = numberMap.get(pins);
+	private void onKeyDown(KeyEvent e) {
+		// Ignore for keyDown
+		int keyCode = e.getKeyCode();
+		switch (keyCode) {
+			case KeyEvent.VK_ENTER:
+			case KeyEvent.VK_SPACE:
+				return;
 		}
-		char keyChar = kd.keyChar; // So that we don't alter the KeyData value in the map.
+		Integer pin = keyPinMap.getOrDefault(keyCode, 0);
+		currentPinCode = currentPinCode | pin;
+		lastKeyDown = true;
+	}
 
-		// Shift blocks ENTER
-		int modifiers = 0;
-		if (shift > 0 && pins != ENTER) {
-			modifiers = KeyEvent.SHIFT_DOWN_MASK;
-			keyChar = Character.toUpperCase(keyChar);
+
+	private void onKeyUp(KeyEvent e) {
+		int keyCode = e.getKeyCode();
+		Integer pin = keyPinMap.getOrDefault(keyCode, 0);
+
+		// Pass through. Reset shift below Caps Lock (3) for white space.
+		switch (keyCode) {
+			case KeyEvent.VK_ENTER:
+			case KeyEvent.VK_SPACE:
+				sendKeyEvents(e.getComponent(), e. getWhen(), brailleMap.get(-keyCode).keyData);
+				if (shift < 3) shift = 0;
+				if (digit < 3) digit = 0;
+				currentPinCodesList.clear();
+				if (shift > 0) currentPinCodesList.add(SHIFT);
+				if (digit > 0) currentPinCodesList.add(DIGIT);
+				lastKeyDown = false;
+				return;
 		}
 
-		log.info("SEND KEYEVENTS: " + pins +", " + kd.keyChar + ", " + kd.keyCode);
+		// Getting engaged when it's the last key left of a larger combination, so only after a keyDown
+		// Can'r have shift and digit engaged simulataneously, as they both use A-J.
+		if (lastKeyDown && (currentPinCode == SHIFT || currentPinCode == DIGIT)) {
+			// Shift
+			if (currentPinCode == SHIFT) {
+				shift++;
+				if (shift > 3) shift = 0;
+				if (digit > 0) digit = 0;
+				currentPinCode = 0;
+				log.info("SHIFT: " + shift);
+			}
+			// Number
+			if (currentPinCode == DIGIT) {
+				digit++;
+				if (digit > 3) digit = 0;
+				if (shift > 0) shift = 0;
+				currentPinCode = ~(~currentPinCode | pin);
+				log.info("DIGIT: " + digit);
+			}
+			// Ensure the pin code sequence is correct.
+			// Shift or digit start a pin code sequence, so just reset,
+			currentPinCodesList.clear();
+			if (shift > 0) currentPinCodesList.add(SHIFT);
+			if (digit > 0) currentPinCodesList.add(DIGIT);
+			lastKeyDown = false;
+			return;
+		}
+		log.info("HERE: " + currentPinCode + ", " + currentPinCodesList.toString() + ", " + shift);
+
+        // If keyUp then find the assocaited MapData, if it exists.
+        if (lastKeyDown) {
+			currentPinCodesList.add(currentPinCode);
+			log.info("PIN CODE SEQUENCE: " + currentPinCodesList.toString());
+			MapData md = getMapDataFromPinCodes();
+			if (md == null) {
+				// Invalid pin code sequence. Reset.
+			} else if (md.keyData != null) {
+				// Send character sequence.
+				sendKeyEvents(e.getComponent(), e.getWhen(), md.keyData);
+				if (shift == 1) shift = 0;
+				if (digit == 1) digit = 0;
+			} else if (md.map != null) {
+				// Get next pin code.
+				return;
+			} else {
+				// Something has gone wrong.
+				log.severe("FOuND EMPTY MAPDATA IN BRAILLE MAP.");
+			}
+			// Reset the pin code sequence, as one way or another it is done with.
+			currentPinCodesList.clear();
+
+			// Deal with word locks of shift and digit
+			if (currentPinCode == ENTER || currentPinCode == SPACE) {
+				if (shift < 3) shift = 0;
+				if (digit < 3) digit = 0;
+			}
+			if (shift == 1) shift = 0;
+			if (digit == 1) digit = 0; 
+			// If shift or digit are locked, add to the pin code sequence now.
+			// They won't both be set.
+			if (shift > 0) currentPinCodesList.add(SHIFT);
+			if (digit > 0) currentPinCodesList.add(DIGIT);
+		}
+
+		currentPinCode = ~(~currentPinCode | pin);
+		lastKeyDown = false;
+	}
+
+
+	private MapData getMapDataFromPinCodes() {
+		HashMap<Integer, MapData> map = brailleMap;
+		MapData md = null;
+		for (int code: currentPinCodesList) {
+			if (map == null) break;
+			md = map.get(code);
+			if (md == null) break;
+			map = md.map;
+		}
+		return md;
+	}
+
+
+	private void sendKeyEvents(Component c, long when, ArrayList<KeyData> keyData) {
+		for (KeyData kd: keyData) {
+			sendKeyEvents(c, when, kd);
+		}
+	}
+
+	private void sendKeyEvents(Component c, long when, KeyData keyData) {
+		log.info("SEND KEYEVENT: " + keyData.keyChar + ", " + keyData.keyCode);
 		KeyEvent newE = new KeyEvent(c,
 									 KeyEvent.KEY_PRESSED,
 									 when,
-									 modifiers,
-									 kd.keyCode,
-									 keyChar);
+									 keyData.modifiers,
+									 keyData.keyCode,
+									 keyData.keyChar);
 		super.processKeyEvent(newE);
 		newE = new KeyEvent(c,
 							KeyEvent.KEY_TYPED,
 							when,
-							modifiers,
+							keyData.modifiers,
 							KeyEvent.VK_UNDEFINED,
-							keyChar);
+							keyData.keyChar);
 		super.processKeyEvent(newE);
 		newE = new KeyEvent(c,
 							KeyEvent.KEY_RELEASED,
 							when,
-							modifiers,
-							kd.keyCode,
-							keyChar);
+							keyData.modifiers,
+							keyData.keyCode,
+							keyData.keyChar);
 		super.processKeyEvent(newE);
 	}
 
-
 	private void addToBrailleMap(int pinCode, KeyData keyData) {
-		if (brailleMap.containsKey(pinCode)) {
-			log.severe("DUPLICATE KEYCODE MAP: "  + pinCode);
-			log.severe("    CURRENT: " + brailleMap.get(pinCode).keyChar);
-			log.severe("    DESIRED: " + keyData.keyChar);
-		} else { 
-			brailleMap.put(pinCode, keyData);
+		int[] pinCodes = {pinCode};
+		ArrayList<KeyData> keyDataAL = new ArrayList<KeyData>();
+		keyDataAL.add(keyData);
+		addToBrailleMap(pinCodes, keyDataAL);
+	}
+
+	private void addToBrailleMap(int pinCode, ArrayList<KeyData> keyData) {
+		int[] pinCodes = {pinCode};
+		addToBrailleMap(pinCodes, keyData);
+	}
+
+	private void addToBrailleMap(int[] pinCodes, KeyData keyData) {
+		ArrayList<KeyData> keyDataAL = new ArrayList<KeyData>();
+		keyDataAL.add(keyData);
+		addToBrailleMap(pinCodes, keyDataAL);
+	}
+
+	private void addToBrailleMap(int[] pinCodes, ArrayList<KeyData> keyData) {
+		addToBrailleMap(pinCodes, 0, keyData, brailleMap);
+	}
+
+	private void addToBrailleMap(int[] pinCodes, int pcIndex, ArrayList<KeyData> keyData, HashMap<Integer, MapData> map) {
+		if (map.containsKey(pinCodes[pcIndex])) {
+			if (pcIndex + 1 == pinCodes.length) {
+				log.severe("DUPLICATE KEYCODE MAP: "  + pinCodes);
+				log.severe("    CURRENT: " + map.get(pinCodes[pcIndex]).keyData);
+				log.severe("    DESIRED: " + keyData);
+				return;
+			} else {
+				addToBrailleMap(pinCodes, pcIndex + 1, keyData, map.get(pinCodes[pcIndex]).map);
+			}
+		} else {
+			if (pcIndex + 1 == pinCodes.length) {
+				MapData md = new MapData(keyData);
+				map.put(pinCodes[pcIndex], md);
+			} else {
+				MapData md = new MapData();
+				map.put(pinCodes[pcIndex], md);
+				addToBrailleMap(pinCodes, pcIndex + 1, keyData, md.map);
+			}
 		}
 	}
 
 
+	private static int[] join(int item1, int item2) {
+		int[] newArr = new int[2];
+		newArr[0] = item1;
+		newArr[1] = item2;
+		return newArr;
+	}
+/*
+	private static int[] join(int[] arr, int item) {
+		int[] newArr = Arrays.copyOf(arr, arr.length + 1);
+		newArr[arr.length] = item;
+		return newArr;
+	}
+
+	private static int[] join(int item, int[] arr) {
+		int[] newArr = new int[arr.length + 1];
+		newArr[0] = item;
+		System.arraycopy(arr, 0, newArr, 1, arr.length);
+		return newArr;
+	}
+*/
+
     private void  populateBrailleMaps() {
 		// LETTERS, PUNCTuATION
-        addToBrailleMap(A, new KeyData('a'));
-        addToBrailleMap(B, new KeyData('b'));
-        addToBrailleMap(C, new KeyData('c'));
-        addToBrailleMap(D, new KeyData('d'));
-        addToBrailleMap(E, new KeyData('e'));
-        addToBrailleMap(F, new KeyData('f'));
-        addToBrailleMap(G, new KeyData('g'));
-        addToBrailleMap(H, new KeyData('h'));
-        addToBrailleMap(I, new KeyData('i'));
-        addToBrailleMap(J, new KeyData('j'));
-        addToBrailleMap(K, new KeyData('k'));
-        addToBrailleMap(L, new KeyData('l'));
-        addToBrailleMap(M, new KeyData('m'));
-        addToBrailleMap(N, new KeyData('n'));
-        addToBrailleMap(O, new KeyData('o'));
-        addToBrailleMap(P, new KeyData('p'));
-        addToBrailleMap(Q, new KeyData('q'));
-        addToBrailleMap(R, new KeyData('r'));
-        addToBrailleMap(S, new KeyData('s'));
-        addToBrailleMap(T, new KeyData('t'));
-        addToBrailleMap(U, new KeyData('u'));
-        addToBrailleMap(V, new KeyData('v'));
-        addToBrailleMap(W, new KeyData('w'));
-        addToBrailleMap(X, new KeyData('x'));
-        addToBrailleMap(Y, new KeyData('y'));
-        addToBrailleMap(Z, new KeyData('z'));
+        addToBrailleMap(Aa, new KeyData('a'));
+        addToBrailleMap(Ab, new KeyData('b'));
+        addToBrailleMap(Ac, new KeyData('c'));
+        addToBrailleMap(Ad, new KeyData('d'));
+        addToBrailleMap(Ae, new KeyData('e'));
+        addToBrailleMap(Af, new KeyData('f'));
+        addToBrailleMap(Ag, new KeyData('g'));
+        addToBrailleMap(Ah, new KeyData('h'));
+        addToBrailleMap(Ai, new KeyData('i'));
+        addToBrailleMap(Aj, new KeyData('j'));
+        addToBrailleMap(Ak, new KeyData('k'));
+        addToBrailleMap(Al, new KeyData('l'));
+        addToBrailleMap(Am, new KeyData('m'));
+        addToBrailleMap(An, new KeyData('n'));
+        addToBrailleMap(Ao, new KeyData('o'));
+        addToBrailleMap(Ap, new KeyData('p'));
+        addToBrailleMap(Aq, new KeyData('q'));
+        addToBrailleMap(Ar, new KeyData('r'));
+        addToBrailleMap(As, new KeyData('s'));
+        addToBrailleMap(At, new KeyData('t'));
+        addToBrailleMap(Au, new KeyData('u'));
+        addToBrailleMap(Av, new KeyData('v'));
+        addToBrailleMap(Aw, new KeyData('w'));
+        addToBrailleMap(Ax, new KeyData('x'));
+        addToBrailleMap(Ay, new KeyData('y'));
+        addToBrailleMap(Az, new KeyData('z'));
+        addToBrailleMap(AA, new KeyData('A', true));
+        addToBrailleMap(AB, new KeyData('B', true));
+        addToBrailleMap(AC, new KeyData('C', true));
+        addToBrailleMap(AD, new KeyData('D', true));
+        addToBrailleMap(AE, new KeyData('E', true));
+        addToBrailleMap(AF, new KeyData('F', true));
+        addToBrailleMap(AG, new KeyData('G', true));
+        addToBrailleMap(AH, new KeyData('H', true));
+        addToBrailleMap(AI, new KeyData('I', true));
+        addToBrailleMap(AJ, new KeyData('J', true));
+        addToBrailleMap(AK, new KeyData('K', true));
+        addToBrailleMap(AL, new KeyData('L', true));
+        addToBrailleMap(AM, new KeyData('M', true));
+        addToBrailleMap(AN, new KeyData('N', true));
+        addToBrailleMap(AO, new KeyData('O', true));
+        addToBrailleMap(AP, new KeyData('P', true));
+        addToBrailleMap(AQ, new KeyData('Q', true));
+        addToBrailleMap(AR, new KeyData('R', true));
+        addToBrailleMap(AS, new KeyData('S', true));
+        addToBrailleMap(AT, new KeyData('T', true));
+        addToBrailleMap(AU, new KeyData('U', true));
+        addToBrailleMap(AV, new KeyData('V', true));
+        addToBrailleMap(AW, new KeyData('W', true));
+        addToBrailleMap(AX, new KeyData('X', true));
+        addToBrailleMap(AY, new KeyData('Y', true));
+        addToBrailleMap(AZ, new KeyData('Z', true));
         addToBrailleMap(ENTER, new KeyData('\n', KeyEvent.VK_ENTER));
+        addToBrailleMap(join(DIGIT, ENTER), brailleMap.get(ENTER).keyData);
+        addToBrailleMap(join(SHIFT, ENTER), new KeyData('\n', KeyEvent.VK_ENTER, true));
 	
 		// NUMBERS
-		// WITH NUMBER PREFiX
-        numberMap.put(D0, new KeyData('0'));
-        numberMap.put(D1, new KeyData('1'));
-        numberMap.put(D2, new KeyData('2'));
-        numberMap.put(D3, new KeyData('3'));
-        numberMap.put(D4, new KeyData('4'));
-        numberMap.put(D5, new KeyData('5'));
-        numberMap.put(D6, new KeyData('6'));
-        numberMap.put(D7, new KeyData('7'));
-        numberMap.put(D8, new KeyData('8'));
-        numberMap.put(D9, new KeyData('9'));
-		// Duplicate in numberMap as we don't want to disable these if we use the digit prefix.
-        numberMap.put(N0, numberMap.get(D0));
-        numberMap.put(N1, numberMap.get(D1));
-        numberMap.put(N2, numberMap.get(D2));
-        numberMap.put(N3, numberMap.get(D3));
-        numberMap.put(N4, numberMap.get(D4));
-        numberMap.put(N5, numberMap.get(D5));
-        numberMap.put(N6, numberMap.get(D6));
-        numberMap.put(N7, numberMap.get(D7));
-        numberMap.put(N8, numberMap.get(D8));
-        numberMap.put(N9, numberMap.get(D9));
 		// COMPUTER NOTATION
-        addToBrailleMap(N0, numberMap.get(D0));
-        addToBrailleMap(N1, numberMap.get(D1));
-        addToBrailleMap(N2, numberMap.get(D2));
-        addToBrailleMap(N3, numberMap.get(D3));
-        addToBrailleMap(N4, numberMap.get(D4));
-        addToBrailleMap(N5, numberMap.get(D5));
-        addToBrailleMap(N6, numberMap.get(D6));
-        addToBrailleMap(N7, numberMap.get(D7));
-        addToBrailleMap(N8, numberMap.get(D8));
-        addToBrailleMap(N9, numberMap.get(D9));
+        addToBrailleMap(N0, new KeyData('0'));
+        addToBrailleMap(N1, new KeyData('1'));
+        addToBrailleMap(N2, new KeyData('2'));
+        addToBrailleMap(N3, new KeyData('3'));
+        addToBrailleMap(N4, new KeyData('4'));
+        addToBrailleMap(N5, new KeyData('5'));
+        addToBrailleMap(N6, new KeyData('6'));
+        addToBrailleMap(N7, new KeyData('7'));
+        addToBrailleMap(N8, new KeyData('8'));
+        addToBrailleMap(N9, new KeyData('9'));
+		// WITH DIGIT PREFIX
+        addToBrailleMap(D0, brailleMap.get(N0).keyData);
+        addToBrailleMap(D1, brailleMap.get(N1).keyData);
+        addToBrailleMap(D2, brailleMap.get(N2).keyData);
+        addToBrailleMap(D3, brailleMap.get(N3).keyData);
+        addToBrailleMap(D4, brailleMap.get(N4).keyData);
+        addToBrailleMap(D5, brailleMap.get(N5).keyData);
+        addToBrailleMap(D6, brailleMap.get(N6).keyData);
+        addToBrailleMap(D7, brailleMap.get(N7).keyData);
+        addToBrailleMap(D8, brailleMap.get(N8).keyData);
+        addToBrailleMap(D9, brailleMap.get(N9).keyData);
 
 		// SIMPLE PUNCTUATION
 		addToBrailleMap(APOSTROPHE, new KeyData('\''));
-		addToBrailleMap(COLON, new KeyData(':', KeyEvent.VK_COLON));
+		addToBrailleMap(COLON, new KeyData(':', KeyEvent.VK_COLON, true));
 		addToBrailleMap(COMMA, new KeyData(',', KeyEvent.VK_COMMA));
-		addToBrailleMap(EXCLAMATION, new KeyData('!', KeyEvent.VK_EXCLAMATION_MARK));
+		addToBrailleMap(EXCLAMATION, new KeyData('!', KeyEvent.VK_EXCLAMATION_MARK, true));
 		addToBrailleMap(FULLSTOP, new KeyData('.', KeyEvent.VK_PERIOD));
 		addToBrailleMap(MINUS, new KeyData('-', KeyEvent.VK_MINUS));
-		addToBrailleMap(QUESTION, new KeyData('?'));
-		addToBrailleMap(QUOTE, new KeyData('"'));
+		addToBrailleMap(QUESTION, new KeyData('?', true));
+		addToBrailleMap(QUOTE, new KeyData('"', true));
 		addToBrailleMap(SEMICOLON, new KeyData(';', KeyEvent.VK_SEMICOLON));
 
-
 		// ASCII CHARACTERS. Stored under the negative of their keycode.
-        addToBrailleMap(-KeyEvent.VK_ENTER, brailleMap.get(ENTER));
+        addToBrailleMap(-KeyEvent.VK_ENTER, brailleMap.get(ENTER).keyData);
         addToBrailleMap(-KeyEvent.VK_SPACE, new KeyData(' ', KeyEvent.VK_SPACE));
 
+		// MAP REAL KEYBOARD TO PINS
         keyPinMap.put(70, 1);   // F
         keyPinMap.put(68, 2);   // D
         keyPinMap.put(83, 4);   // S
@@ -270,33 +417,65 @@ public class TextAreaBraille extends JTextArea {
     }
 
 	// PINCODES
+	// SPECIAL
+	public static final int DIGIT = 60;
+	public static final int ENTER = 128;
+	public static final int SHIFT = 32;
+	public static final int SPACE = -32;
+
 	// LETTERS
-	public static final int A = 1;
-	public static final int B = 3;
-	public static final int C = 9;
-	public static final int D = 25;
-	public static final int E = 17;
-	public static final int F = 11;
-	public static final int G = 27;
-	public static final int H = 19;
-	public static final int I = 10;
-	public static final int J = 26;
-	public static final int K = 5;
-	public static final int L = 7;
-	public static final int M = 13;
-	public static final int N = 29;
-	public static final int O = 21;
-	public static final int P = 15;
-	public static final int Q = 31;
-	public static final int R = 23;
-	public static final int S = 14;
-	public static final int T = 30;
-	public static final int U = 37;
-	public static final int V = 39;
-	public static final int W = 58;
-	public static final int X = 45;
-	public static final int Y = 61;
-	public static final int Z = 53;
+	public static final int Aa = 1;
+	public static final int Ab = 3;
+	public static final int Ac = 9;
+	public static final int Ad = 25;
+	public static final int Ae = 17;
+	public static final int Af = 11;
+	public static final int Ag = 27;
+	public static final int Ah = 19;
+	public static final int Ai = 10;
+	public static final int Aj = 26;
+	public static final int Ak = 5;
+	public static final int Al = 7;
+	public static final int Am = 13;
+	public static final int An = 29;
+	public static final int Ao = 21;
+	public static final int Ap = 15;
+	public static final int Aq = 31;
+	public static final int Ar = 23;
+	public static final int As = 14;
+	public static final int At = 30;
+	public static final int Au = 37;
+	public static final int Av = 39;
+	public static final int Aw = 58;
+	public static final int Ax = 45;
+	public static final int Ay = 61;
+	public static final int Az = 53;
+	public static final int[] AA = join(SHIFT, 1);
+	public static final int[] AB = join(SHIFT, 3);
+	public static final int[] AC = join(SHIFT, 9);
+	public static final int[] AD = join(SHIFT, 25);
+	public static final int[] AE = join(SHIFT, 17);
+	public static final int[] AF = join(SHIFT, 11);
+	public static final int[] AG = join(SHIFT, 27);
+	public static final int[] AH = join(SHIFT, 19);
+	public static final int[] AI = join(SHIFT, 10);
+	public static final int[] AJ = join(SHIFT, 26);
+	public static final int[] AK = join(SHIFT, 5);
+	public static final int[] AL = join(SHIFT, 7);
+	public static final int[] AM = join(SHIFT, 13);
+	public static final int[] AN = join(SHIFT, 29);
+	public static final int[] AO = join(SHIFT, 21);
+	public static final int[] AP = join(SHIFT, 15);
+	public static final int[] AQ = join(SHIFT, 31);
+	public static final int[] AR = join(SHIFT, 23);
+	public static final int[] AS = join(SHIFT, 14);
+	public static final int[] AT = join(SHIFT, 30);
+	public static final int[] AU = join(SHIFT, 37);
+	public static final int[] AV = join(SHIFT, 39);
+	public static final int[] AW = join(SHIFT, 58);
+	public static final int[] AX = join(SHIFT, 45);
+	public static final int[] AY = join(SHIFT, 61);
+	public static final int[] AZ = join(SHIFT, 53);
 
 	// NUMBERS
 	public static final int N0 = 63;
@@ -309,16 +488,16 @@ public class TextAreaBraille extends JTextArea {
 	public static final int N7 = 59;
 	public static final int N8 = 51;
 	public static final int N9 = 42;
-	public static final int D1 = A;
-	public static final int D2 = B;
-	public static final int D3 = C;
-	public static final int D4 = D;
-	public static final int D5 = E;
-	public static final int D6 = F;
-	public static final int D7 = G;
-	public static final int D8 = H;
-	public static final int D9 = I;
-	public static final int D0 = J;
+	public static final int[] D1 = join(DIGIT, Aa);
+	public static final int[] D2 = join(DIGIT, Ab);
+	public static final int[] D3 = join(DIGIT, Ac);
+	public static final int[] D4 = join(DIGIT, Ad);
+	public static final int[] D5 = join(DIGIT, Ae);
+	public static final int[] D6 = join(DIGIT, Af);
+	public static final int[] D7 = join(DIGIT, Ag);
+	public static final int[] D8 = join(DIGIT, Ah);
+	public static final int[] D9 = join(DIGIT, Ai);
+	public static final int[] D0 = join(DIGIT, Aj);
 
 	// PUNCTUATION
 	public static final int APOSTROPHE = 4;
@@ -331,10 +510,4 @@ public class TextAreaBraille extends JTextArea {
 	public static final int QUESTION = 38;
 	public static final int QUOTE = 8;
 	public static final int SEMICOLON = 6;
-
-	// SPECIAL
-	public static final int DIGIT = 60;
-	public static final int ENTER = 128;
-	public static final int SHIFT = 32;
-	public static final int SPACE = -32;
 }
