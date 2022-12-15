@@ -364,7 +364,7 @@ public class TextAreaBraille extends JTextArea {
         addToBrailleMap(AZ, new KeyData('Z', true));
         addToBrailleMap(ENTER, new KeyData('\n', KeyEvent.VK_ENTER));
         addToBrailleMap(join(DIGIT, ENTER), brailleMap.get(ENTER).keyData);
-        addToBrailleMap(join(SHIFT, ENTER), new KeyData('\n', KeyEvent.VK_ENTER, true));
+        addToBrailleMap(join(SHIFT, ENTER), brailleMap.get(ENTER).keyData);
 	
 		// NUMBERS
 		// COMPUTER NOTATION
