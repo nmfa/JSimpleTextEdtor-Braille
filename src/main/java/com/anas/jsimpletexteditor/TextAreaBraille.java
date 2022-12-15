@@ -83,7 +83,7 @@ public class TextAreaBraille extends JTextArea {
 
     @Override
     protected void processKeyEvent(KeyEvent e) {
-		log.info("PROCESS KEY EVENT: " + currentPinCode + ", " + currentPinCodesList.toString() + ", " + shift);
+		log.info("PROCESS KEY EVENT: " + currentPinCode + ", " + currentPinCodesList.toString() + ", " + keyPinMap.getOrDefault(e.getKeyCode(), 0));
 		// Not setting lastKeyDown here, as it'll make the onKeyDown and onKeyUp logic consistent for when it is
 		// moved to an API which has those functions, rather than this single API function.
 		if (e.getID() == KeyEvent.KEY_PRESSED) {
@@ -92,8 +92,8 @@ public class TextAreaBraille extends JTextArea {
 			onKeyUp(e);
         } else {
             // Ignore
-            return;
         }
+		log.info("PROCESSED: " + currentPinCode + ", " + currentPinCodesList.toString());
     }
 
 
@@ -132,7 +132,7 @@ public class TextAreaBraille extends JTextArea {
 		}
 
 		// Getting engaged when it's the last key left of a larger combination, so only after a keyDown
-		// Can'r have shift and digit engaged simulataneously, as they both use A-J.
+		// Can't have shift and digit engaged simultaneously, as they both use A-J.
 		if (lastKeyDown && (currentPinCode == SHIFT || currentPinCode == DIGIT)) {
 			// Shift
 			if (currentPinCode == SHIFT) {
@@ -174,6 +174,8 @@ public class TextAreaBraille extends JTextArea {
 				if (digit == 1) digit = 0;
 			} else if (md.map != null) {
 				// Get next pin code.
+				currentPinCode = ~(~currentPinCode | pin);
+				lastKeyDown = false;
 				return;
 			} else {
 				// Something has gone wrong.
@@ -409,6 +411,8 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(SEMICOLON, new KeyData(';', KeyEvent.VK_SEMICOLON));
 
 		// SHIFT PUNCTUATION
+		addToBrailleMap(BACK_SLASH, new KeyData('\\', KeyEvent.VK_BACK_SLASH));
+		addToBrailleMap(FORWARD_SLASH, new KeyData('/', KeyEvent.VK_SLASH));
 		addToBrailleMap(UNDERSCORE, new KeyData('_', KeyEvent.VK_UNDERSCORE, true));
 
 		// ASCII CHARACTERS. Stored under the negative of their keycode.
@@ -431,7 +435,13 @@ public class TextAreaBraille extends JTextArea {
 	// SPECIAL
 	public static final int DIGIT = 60;
 	public static final int ENTER = 128;
-	public static final int SHIFT = 32;
+	public static final int SHIFT8 = 8;
+	public static final int SHIFT16 = 16;
+	public static final int SHIFT24 = 24;
+	public static final int SHIFT32 = 32;
+	public static final int SHIFT40 = 40;
+	public static final int SHIFT56 = 56;
+	public static final int SHIFT = SHIFT32;
 	public static final int SPACE = -KeyEvent.VK_SPACE;
 
 	// LETTERS
@@ -523,5 +533,8 @@ public class TextAreaBraille extends JTextArea {
 	public static final int SEMICOLON = 6;
 
 	// SHIFT PUNCTUATION
+	public static final int[] BACK_SLASH = join(SHIFT56, 33);
+	public static final int[] FORWARD_SLASH = join(SHIFT56, 12);
 	public static final int[] UNDERSCORE = join(SHIFT, HYPHEN);
+
 }
