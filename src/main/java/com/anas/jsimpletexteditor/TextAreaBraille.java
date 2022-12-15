@@ -103,6 +103,7 @@ public class TextAreaBraille extends JTextArea {
 		switch (keyCode) {
 			case KeyEvent.VK_ENTER:
 			case KeyEvent.VK_SPACE:
+			case KeyEvent.VK_BACK_SPACE:
 				return;
 		}
 		Integer pin = keyPinMap.getOrDefault(keyCode, 0);
@@ -119,6 +120,7 @@ public class TextAreaBraille extends JTextArea {
 		switch (keyCode) {
 			case KeyEvent.VK_ENTER:
 			case KeyEvent.VK_SPACE:
+			case KeyEvent.VK_BACK_SPACE:
 				sendKeyEvents(e.getComponent(), e. getWhen(), brailleMap.get(-keyCode).keyData);
 				if (shift < 3) shift = 0;
 				if (digit < 3) digit = 0;
@@ -309,6 +311,11 @@ public class TextAreaBraille extends JTextArea {
 */
 
     private void  populateBrailleMaps() {
+		// SOME COMMON KEYEVENTS
+		final KeyData KD_BACK_SPACE = new KeyData('\b', KeyEvent.VK_BACK_SPACE);
+		final KeyData KD_ENTER = new KeyData('\n', KeyEvent.VK_ENTER);
+		final KeyData KD_SPACE = new KeyData(' ', KeyEvent.VK_SPACE);
+
 		// LETTERS, PUNCTuATION
         addToBrailleMap(Aa, new KeyData('a'));
         addToBrailleMap(Ab, new KeyData('b'));
@@ -362,9 +369,9 @@ public class TextAreaBraille extends JTextArea {
         addToBrailleMap(AX, new KeyData('X', true));
         addToBrailleMap(AY, new KeyData('Y', true));
         addToBrailleMap(AZ, new KeyData('Z', true));
-        addToBrailleMap(ENTER, new KeyData('\n', KeyEvent.VK_ENTER));
-        addToBrailleMap(join(DIGIT, ENTER), brailleMap.get(ENTER).keyData);
-        addToBrailleMap(join(SHIFT, ENTER), brailleMap.get(ENTER).keyData);
+        addToBrailleMap(ENTER, KD_ENTER);
+        addToBrailleMap(join(DIGIT, ENTER), KD_ENTER);
+        addToBrailleMap(join(SHIFT, ENTER), KD_ENTER);
 	
 		// NUMBERS
 		// COMPUTER NOTATION
@@ -401,9 +408,13 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(QUOTE, new KeyData('"', true));
 		addToBrailleMap(SEMICOLON, new KeyData(';', KeyEvent.VK_SEMICOLON));
 
+		// SHIFT PUNCTUATION
+		addToBrailleMap(UNDERSCORE, new KeyData('_', KeyEvent.VK_UNDERSCORE, true));
+
 		// ASCII CHARACTERS. Stored under the negative of their keycode.
         addToBrailleMap(-KeyEvent.VK_ENTER, brailleMap.get(ENTER).keyData);
-        addToBrailleMap(-KeyEvent.VK_SPACE, new KeyData(' ', KeyEvent.VK_SPACE));
+        addToBrailleMap(-KeyEvent.VK_SPACE, KD_SPACE);
+    	addToBrailleMap(-KeyEvent.VK_BACK_SPACE, KD_BACK_SPACE);
 
 		// MAP REAL KEYBOARD TO PINS
         keyPinMap.put(70, 1);   // F
@@ -421,7 +432,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int DIGIT = 60;
 	public static final int ENTER = 128;
 	public static final int SHIFT = 32;
-	public static final int SPACE = -32;
+	public static final int SPACE = -KeyEvent.VK_SPACE;
 
 	// LETTERS
 	public static final int Aa = 1;
@@ -499,7 +510,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] D9 = join(DIGIT, Ai);
 	public static final int[] D0 = join(DIGIT, Aj);
 
-	// PUNCTUATION
+	// SIMPLE PUNCTUATION
 	public static final int APOSTROPHE = 4;
 	public static final int COLON = 18;
 	public static final int COMMA = 2;
@@ -510,4 +521,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int QUESTION = 38;
 	public static final int QUOTE = 8;
 	public static final int SEMICOLON = 6;
+
+	// SHIFT PUNCTUATION
+	public static final int[] UNDERSCORE = join(SHIFT, HYPHEN);
 }
