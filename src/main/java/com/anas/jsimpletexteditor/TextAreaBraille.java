@@ -436,35 +436,52 @@ public class TextAreaBraille extends JTextArea {
         addToBrailleMap(SHARP, new KeyData('♯'));
 
 		// SIMPLE PUNCTUATION
+		addToBrailleMap(AMPERSAND, new KeyData('&', true));
 		addToBrailleMap(APOSTROPHE, new KeyData('\''));
+		addToBrailleMap(AT_SIGN, new KeyData('@', true));
+		addToBrailleMap(BACK_SLASH, new KeyData('\\', KeyEvent.VK_BACK_SLASH));
+		addToBrailleMap(CARET, new KeyData('^', true));
+
 		addToBrailleMap(COLON, new KeyData(':', KeyEvent.VK_COLON, true));
 		addToBrailleMap(COMMA, new KeyData(',', KeyEvent.VK_COMMA));
 		addToBrailleMap(EXCLAMATION, new KeyData('!', KeyEvent.VK_EXCLAMATION_MARK, true));
+		addToBrailleMap(FORWARD_SLASH, new KeyData('/', KeyEvent.VK_SLASH));
 		addToBrailleMap(FULLSTOP, new KeyData('.', KeyEvent.VK_PERIOD));
 		addToBrailleMap(MINUS, new KeyData('-', KeyEvent.VK_MINUS));
 		addToBrailleMap(PRIME, new KeyData('′'));
 		addToBrailleMap(QUESTION, new KeyData('?', true));
 		//addToBrailleMap(QUOTE, new KeyData('"', true));
 		addToBrailleMap(SEMICOLON, new KeyData(';', KeyEvent.VK_SEMICOLON));
+		addToBrailleMap(TILDE, new KeyData('~', true));
+		addToBrailleMap(UNDERSCORE, new KeyData('_', KeyEvent.VK_UNDERSCORE, true));
 
-		// SHIFT PUNCTUATION
+		// COMPLEX PUNCTUATION
+		addToBrailleMap(DOUBLE_PRIME, KD_BACKSPACE, new KeyData('″'));
+
+		// GROUP PUNCTUATION
 		addToBrailleMap(ANGLE_BRACKET_OPEN, new KeyData('<', true));
 		addToBrailleMap(ANGLE_BRACKET_CLOSE, new KeyData('>', true));
-		addToBrailleMap(BACK_SLASH, new KeyData('\\', KeyEvent.VK_BACK_SLASH));
 		addToBrailleMap(CURLY_BRACKET_OPEN, new KeyData('{', true));
 		addToBrailleMap(CURLY_BRACKET_CLOSE, new KeyData('}', true));
-		addToBrailleMap(DOUBLE_PRIME, KD_BACKSPACE, new KeyData('″'));
-		addToBrailleMap(FORWARD_SLASH, new KeyData('/', KeyEvent.VK_SLASH));
 		addToBrailleMap(ROUND_BRACKET_OPEN, new KeyData('(', true));
 		addToBrailleMap(ROUND_BRACKET_CLOSE, new KeyData(')', true));
 		addToBrailleMap(SQUARE_BRACKET_OPEN, new KeyData('['));
 		addToBrailleMap(SQUARE_BRACKET_CLOSE, new KeyData(']'));
-		addToBrailleMap(UNDERSCORE, new KeyData('_', KeyEvent.VK_UNDERSCORE, true));
+
+		// CURRENCY
+		addToBrailleMap(CENT, new KeyData('¢'));
+		addToBrailleMap(DOLLAR, new KeyData('$', KeyEvent.VK_DOLLAR, true));
+		addToBrailleMap(EURO, new KeyData('€'));
+		addToBrailleMap(FRANC, new KeyData('₣'));
+		addToBrailleMap(GBP, new KeyData('£', true));
+		addToBrailleMap(NAIRA, new KeyData('₦'));
+		addToBrailleMap(YEN, new KeyData('¥'));
 
 		// ASCII CHARACTERS. Stored under the negative of their keycode.
         addToBrailleMap(-KeyEvent.VK_ENTER, brailleMap.get(ENTER).keyData);
         addToBrailleMap(-KeyEvent.VK_SPACE, KD_SPACE);
     	addToBrailleMap(-KeyEvent.VK_BACK_SPACE, KD_BACKSPACE);
+
 
 		// MAP REAL KEYBOARD TO PINS
         keyPinMap.put(70, 1);   // F
@@ -476,6 +493,7 @@ public class TextAreaBraille extends JTextArea {
         keyPinMap.put(65, 64);  // A
         keyPinMap.put(59, 128); // ;
     }
+
 
 	// PINCODES
 	// SPECIAL
@@ -520,32 +538,32 @@ public class TextAreaBraille extends JTextArea {
 	public static final int Ax = 45;
 	public static final int Ay = 61;
 	public static final int Az = 53;
-	public static final int[] AA = join(SHIFT, 1);
-	public static final int[] AB = join(SHIFT, 3);
-	public static final int[] AC = join(SHIFT, 9);
-	public static final int[] AD = join(SHIFT, 25);
-	public static final int[] AE = join(SHIFT, 17);
-	public static final int[] AF = join(SHIFT, 11);
-	public static final int[] AG = join(SHIFT, 27);
-	public static final int[] AH = join(SHIFT, 19);
-	public static final int[] AI = join(SHIFT, 10);
-	public static final int[] AJ = join(SHIFT, 26);
-	public static final int[] AK = join(SHIFT, 5);
-	public static final int[] AL = join(SHIFT, 7);
-	public static final int[] AM = join(SHIFT, 13);
-	public static final int[] AN = join(SHIFT, 29);
-	public static final int[] AO = join(SHIFT, 21);
-	public static final int[] AP = join(SHIFT, 15);
-	public static final int[] AQ = join(SHIFT, 31);
-	public static final int[] AR = join(SHIFT, 23);
-	public static final int[] AS = join(SHIFT, 14);
-	public static final int[] AT = join(SHIFT, 30);
-	public static final int[] AU = join(SHIFT, 37);
-	public static final int[] AV = join(SHIFT, 39);
-	public static final int[] AW = join(SHIFT, 58);
-	public static final int[] AX = join(SHIFT, 45);
-	public static final int[] AY = join(SHIFT, 61);
-	public static final int[] AZ = join(SHIFT, 53);
+	public static final int[] AA = join(SHIFT, Aa);
+	public static final int[] AB = join(SHIFT, Ab);
+	public static final int[] AC = join(SHIFT, Ac);
+	public static final int[] AD = join(SHIFT, Ad);
+	public static final int[] AE = join(SHIFT, Ae);
+	public static final int[] AF = join(SHIFT, Af);
+	public static final int[] AG = join(SHIFT, Ag);
+	public static final int[] AH = join(SHIFT, Ah);
+	public static final int[] AI = join(SHIFT, Ai);
+	public static final int[] AJ = join(SHIFT, Aj);
+	public static final int[] AK = join(SHIFT, Ak);
+	public static final int[] AL = join(SHIFT, Al);
+	public static final int[] AM = join(SHIFT, Am);
+	public static final int[] AN = join(SHIFT, An);
+	public static final int[] AO = join(SHIFT, Ao);
+	public static final int[] AP = join(SHIFT, Ap);
+	public static final int[] AQ = join(SHIFT, Aq);
+	public static final int[] AR = join(SHIFT, Ar);
+	public static final int[] AS = join(SHIFT, As);
+	public static final int[] AT = join(SHIFT, At);
+	public static final int[] AU = join(SHIFT, Au);
+	public static final int[] AV = join(SHIFT, Av);
+	public static final int[] AW = join(SHIFT, Aw);
+	public static final int[] AX = join(SHIFT, Ax);
+	public static final int[] AY = join(SHIFT, Ay);
+	public static final int[] AZ = join(SHIFT, Az);
 
 	// NUMBERS
 	public static final int N0 = 63;
@@ -583,18 +601,36 @@ public class TextAreaBraille extends JTextArea {
 	public static final int QUESTION = 38;
 	public static final int SEMICOLON = 6;
 
-	// SHIFT PUNCTUATION
+	// COMPLEX PUNCTUATION
+	public static final int[] DOUBLE_PRIME = join(PRIME, PRIME);
+	public static final int[] UNDERSCORE = join(SHIFT40, HYPHEN);
+
+	// GROUP PUNCTUATION
 	public static final int[] ANGLE_BRACKET_OPEN = join(SHIFT8, GROUP_OPEN);
 	public static final int[] ANGLE_BRACKET_CLOSE = join(SHIFT8, GROUP_CLOSE);
-	public static final int[] BACK_SLASH = join(SHIFT56, 33);
 	public static final int[] CURLY_BRACKET_OPEN = join(SHIFT56, GROUP_OPEN);
 	public static final int[] CURLY_BRACKET_CLOSE = join(SHIFT56, GROUP_CLOSE);
-	public static final int[] DOUBLE_PRIME = join(PRIME, PRIME);
-	public static final int[] FORWARD_SLASH = join(SHIFT56, 12);
 	public static final int[] ROUND_BRACKET_OPEN = join(SHIFT16, GROUP_OPEN);
 	public static final int[] ROUND_BRACKET_CLOSE = join(SHIFT16, GROUP_CLOSE);
 	public static final int[] SQUARE_BRACKET_OPEN = join(SHIFT40, GROUP_OPEN);
 	public static final int[] SQUARE_BRACKET_CLOSE = join(SHIFT40, GROUP_CLOSE);
-	public static final int[] UNDERSCORE = join(SHIFT40, HYPHEN);
 
+	// SHIFT 8 / CURRENCY
+	public static final int[] AMPERSAND = join(SHIFT8, 47);
+	public static final int[] AT_SIGN = join(SHIFT8, Aa);
+	public static final int[] CARET = join(SHIFT8, 34);
+	public static final int[] CENT = join(SHIFT8, Ac);
+	public static final int[] DOLLAR = join(SHIFT8, As);
+	public static final int[] EURO = join(SHIFT8, Ae);
+	public static final int[] FRANC = join(SHIFT8, Af);
+	public static final int[] GBP = join(SHIFT8, Al);
+	public static final int[] GRREATER_THAN = ANGLE_BRACKET_CLOSE;
+	public static final int[] LESS_THAN = ANGLE_BRACKET_OPEN;
+	public static final int[] NAIRA = join(SHIFT8, An);
+	public static final int[] TILDE = join(SHIFT8, 20);
+	public static final int[] YEN = join(SHIFT8, Ay);
+
+	// SHIFT 56
+	public static final int[] BACK_SLASH = join(SHIFT56, 33);
+	public static final int[] FORWARD_SLASH = join(SHIFT56, 12);
 }
