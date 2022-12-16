@@ -28,6 +28,10 @@ class MapData {
 		keyData = kd;
 		map = null;
 	}
+
+	public void addMap() {
+		if (map == null) map = new HashMap<Integer, MapData>();
+	}
 }
 
 class KeyData {
@@ -75,6 +79,7 @@ public class TextAreaBraille extends JTextArea {
     private boolean lastKeyDown = false;
 	private int shift = 0; // 0 = no shift, 1 = normal, 2 = word, 3 = Caps Lock
 	private int digit = 0; // 0 = not a digit, 1 = normal, 2 = word, 3 = Num Lock
+	private int pinCodeOverflow = 0; // Depth of overflow when doing prime, double prime type examples.
 
     TextAreaBraille() {
         super();
@@ -153,6 +158,7 @@ public class TextAreaBraille extends JTextArea {
 			// Ensure the pin code sequence is correct.
 			// Shift or digit start a pin code sequence, so just reset,
 			currentPinCodesList.clear();
+			pinCodeOverflow = 0;
 			if (shift > 0) currentPinCodesList.add(SHIFT);
 			if (digit > 0) currentPinCodesList.add(DIGIT);
 			lastKeyDown = false;
@@ -166,23 +172,37 @@ public class TextAreaBraille extends JTextArea {
 			log.info("PIN CODE SEQUENCE: " + currentPinCodesList.toString());
 			MapData md = getMapDataFromPinCodes();
 			if (md == null) {
-				// Invalid pin code sequence. Reset.
-			} else if (md.keyData != null) {
-				// Send character sequence.
-				sendKeyEvents(e.getComponent(), e.getWhen(), md.keyData);
-				if (shift == 1) shift = 0;
-				if (digit == 1) digit = 0;
-			} else if (md.map != null) {
-				// Get next pin code.
-				currentPinCode = ~(~currentPinCode | pin);
-				lastKeyDown = false;
-				return;
+				// Invalid pin code sequence. Need to account for pin code overflows.
+				// This should only ever recurse once.
+				if (pinCodeOverflow > 0) {
+					currentPinCodesList.clear();
+					pinCodeOverflow = 0;
+					if (shift == 1) shift = 0;
+					if (digit == 1) digit = 0; 
+					if (shift > 0) currentPinCodesList.add(SHIFT);
+					if (digit > 0) currentPinCodesList.add(DIGIT);
+					onKeyUp(e);
+				}
+			} else if (md.keyData != null || md.map != null) {
+				if (md.keyData != null) {
+					// Send character sequence.
+					sendKeyEvents(e.getComponent(), e.getWhen(), md.keyData);
+				}
+				// We may possibly be doing a prime, double prime situation.
+				if (md.map != null) {
+					// Get next pin code.
+					currentPinCode = ~(~currentPinCode | pin);
+					lastKeyDown = false;
+					pinCodeOverflow++;
+					return;
+				}
 			} else {
 				// Something has gone wrong.
 				log.severe("FOuND EMPTY MAPDATA IN BRAILLE MAP.");
 			}
 			// Reset the pin code sequence, as one way or another it is done with.
 			currentPinCodesList.clear();
+			pinCodeOverflow = 0;
 
 			// Deal with word locks of shift and digit
 			if (currentPinCode == ENTER || currentPinCode == SPACE) {
@@ -246,6 +266,7 @@ public class TextAreaBraille extends JTextArea {
 		super.processKeyEvent(newE);
 	}
 
+
 	private void addToBrailleMap(int pinCode, KeyData keyData) {
 		int[] pinCodes = {pinCode};
 		ArrayList<KeyData> keyDataAL = new ArrayList<KeyData>();
@@ -264,18 +285,32 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(pinCodes, keyDataAL);
 	}
 
+	private void addToBrailleMap(int[] pinCodes, KeyData keyData1, KeyData keyData2) {
+		ArrayList<KeyData> keyDataAL = new ArrayList<KeyData>();
+		keyDataAL.add(keyData1);
+		keyDataAL.add(keyData2);
+		addToBrailleMap(pinCodes, keyDataAL);
+	}
+
 	private void addToBrailleMap(int[] pinCodes, ArrayList<KeyData> keyData) {
 		addToBrailleMap(pinCodes, 0, keyData, brailleMap);
 	}
 
 	private void addToBrailleMap(int[] pinCodes, int pcIndex, ArrayList<KeyData> keyData, HashMap<Integer, MapData> map) {
-		if (map.containsKey(pinCodes[pcIndex])) {
+		MapData mapData =  map.get(pinCodes[pcIndex]);
+		if (mapData != null) {
 			if (pcIndex + 1 == pinCodes.length) {
-				log.severe("DUPLICATE KEYCODE MAP: "  + pinCodes);
-				log.severe("    CURRENT: " + map.get(pinCodes[pcIndex]).keyData);
-				log.severe("    DESIRED: " + keyData);
-				return;
+				if (mapData.keyData != null) {
+					log.severe("DUPLICATE KEYCODE MAP: "  + pinCodes);
+					log.severe("    CURRENT: " + mapData.keyData);
+					log.severe("    DESIRED: " + keyData);
+				} else {
+					mapData.keyData = keyData;
+				}
 			} else {
+				// In the case where KeyData exists, but the same symbol can also be part of a combination
+				// eg: rime & double prime
+				if (mapData.map == null) mapData.addMap();
 				addToBrailleMap(pinCodes, pcIndex + 1, keyData, map.get(pinCodes[pcIndex]).map);
 			}
 		} else {
@@ -314,7 +349,7 @@ public class TextAreaBraille extends JTextArea {
 
     private void  populateBrailleMaps() {
 		// SOME COMMON KEYEVENTS
-		final KeyData KD_BACK_SPACE = new KeyData('\b', KeyEvent.VK_BACK_SPACE);
+		final KeyData KD_BACKSPACE = new KeyData('\b', KeyEvent.VK_BACK_SPACE);
 		final KeyData KD_ENTER = new KeyData('\n', KeyEvent.VK_ENTER);
 		final KeyData KD_SPACE = new KeyData(' ', KeyEvent.VK_SPACE);
 
@@ -398,6 +433,7 @@ public class TextAreaBraille extends JTextArea {
         addToBrailleMap(D7, brailleMap.get(N7).keyData);
         addToBrailleMap(D8, brailleMap.get(N8).keyData);
         addToBrailleMap(D9, brailleMap.get(N9).keyData);
+        addToBrailleMap(SHARP, new KeyData('♯'));
 
 		// SIMPLE PUNCTUATION
 		addToBrailleMap(APOSTROPHE, new KeyData('\''));
@@ -417,6 +453,7 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(BACK_SLASH, new KeyData('\\', KeyEvent.VK_BACK_SLASH));
 		addToBrailleMap(CURLY_BRACKET_OPEN, new KeyData('{', true));
 		addToBrailleMap(CURLY_BRACKET_CLOSE, new KeyData('}', true));
+		addToBrailleMap(DOUBLE_PRIME, KD_BACKSPACE, new KeyData('″'));
 		addToBrailleMap(FORWARD_SLASH, new KeyData('/', KeyEvent.VK_SLASH));
 		addToBrailleMap(ROUND_BRACKET_OPEN, new KeyData('(', true));
 		addToBrailleMap(ROUND_BRACKET_CLOSE, new KeyData(')', true));
@@ -427,7 +464,7 @@ public class TextAreaBraille extends JTextArea {
 		// ASCII CHARACTERS. Stored under the negative of their keycode.
         addToBrailleMap(-KeyEvent.VK_ENTER, brailleMap.get(ENTER).keyData);
         addToBrailleMap(-KeyEvent.VK_SPACE, KD_SPACE);
-    	addToBrailleMap(-KeyEvent.VK_BACK_SPACE, KD_BACK_SPACE);
+    	addToBrailleMap(-KeyEvent.VK_BACK_SPACE, KD_BACKSPACE);
 
 		// MAP REAL KEYBOARD TO PINS
         keyPinMap.put(70, 1);   // F
@@ -453,6 +490,8 @@ public class TextAreaBraille extends JTextArea {
 	public static final int SHIFT56 = 56;
 	public static final int SHIFT = SHIFT32;
 	public static final int SPACE = -KeyEvent.VK_SPACE;
+	public static final int GROUP_OPEN = 35; // same as N2
+	public static final int GROUP_CLOSE = 28;
 
 	// LETTERS
 	public static final int Aa = 1;
@@ -529,7 +568,9 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] D8 = join(DIGIT, Ah);
 	public static final int[] D9 = join(DIGIT, Ai);
 	public static final int[] D0 = join(DIGIT, Aj);
-
+	public static final int[] NATURAL = join(DIGIT, 33); // No Arial char
+	public static final int[] FLAT = join(DIGIT, GROUP_OPEN); // No Arial char
+	public static final int[] SHARP = join(DIGIT, 41);
 	// SIMPLE PUNCTUATION
 	public static final int APOSTROPHE = 4;
 	public static final int COLON = 18;
@@ -543,17 +584,16 @@ public class TextAreaBraille extends JTextArea {
 	public static final int SEMICOLON = 6;
 
 	// SHIFT PUNCTUATION
-	public static final int GROUP_OPEM = 35; // same as N2
-	public static final int GROUP_CLOSE = 28;
-	public static final int[] ANGLE_BRACKET_OPEN = join(SHIFT8, GROUP_OPEM);
+	public static final int[] ANGLE_BRACKET_OPEN = join(SHIFT8, GROUP_OPEN);
 	public static final int[] ANGLE_BRACKET_CLOSE = join(SHIFT8, GROUP_CLOSE);
 	public static final int[] BACK_SLASH = join(SHIFT56, 33);
-	public static final int[] CURLY_BRACKET_OPEN = join(SHIFT56, GROUP_OPEM);
+	public static final int[] CURLY_BRACKET_OPEN = join(SHIFT56, GROUP_OPEN);
 	public static final int[] CURLY_BRACKET_CLOSE = join(SHIFT56, GROUP_CLOSE);
+	public static final int[] DOUBLE_PRIME = join(PRIME, PRIME);
 	public static final int[] FORWARD_SLASH = join(SHIFT56, 12);
-	public static final int[] ROUND_BRACKET_OPEN = join(SHIFT16, GROUP_OPEM);
+	public static final int[] ROUND_BRACKET_OPEN = join(SHIFT16, GROUP_OPEN);
 	public static final int[] ROUND_BRACKET_CLOSE = join(SHIFT16, GROUP_CLOSE);
-	public static final int[] SQUARE_BRACKET_OPEN = join(SHIFT40, GROUP_OPEM);
+	public static final int[] SQUARE_BRACKET_OPEN = join(SHIFT40, GROUP_OPEN);
 	public static final int[] SQUARE_BRACKET_CLOSE = join(SHIFT40, GROUP_CLOSE);
 	public static final int[] UNDERSCORE = join(SHIFT40, HYPHEN);
 
