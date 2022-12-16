@@ -3,6 +3,7 @@ package com.anas.jsimpletexteditor;
 import java.awt.Component;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.logging.Logger;
 import javax.swing.JTextArea;
@@ -139,30 +140,33 @@ public class TextAreaBraille extends JTextArea {
 		// Getting engaged when it's the last key left of a larger combination, so only after a keyDown
 		// Can't have shift and digit engaged simultaneously, as they both use A-J.
 		if (lastKeyDown && (currentPinCode == SHIFT || currentPinCode == DIGIT)) {
-			// Shift
-			if (currentPinCode == SHIFT) {
-				shift++;
-				if (shift > 3) shift = 0;
-				if (digit > 0) digit = 0;
-				currentPinCode = 0;
-				log.info("SHIFT: " + shift);
+			if (!(currentPinCodesList.size() > 0 && currentPinCodesList.get(0) == SHIFT8)) {
+				log.info("NOT SHIFT 8");
+				// Shift
+				if (currentPinCode == SHIFT) {
+					shift++;
+					if (shift > 3) shift = 0;
+					if (digit > 0) digit = 0;
+					currentPinCode = 0;
+					log.info("SHIFT: " + shift);
+				}
+				// Number
+				if (currentPinCode == DIGIT) {
+					digit++;
+					if (digit > 3) digit = 0;
+					if (shift > 0) shift = 0;
+					currentPinCode = ~(~currentPinCode | pin);
+					log.info("DIGIT: " + digit);
+				}
+				// Ensure the pin code sequence is correct.
+				// Shift or digit start a pin code sequence, so just reset,
+				currentPinCodesList.clear();
+				pinCodeOverflow = 0;
+				if (shift > 0) currentPinCodesList.add(SHIFT);
+				if (digit > 0) currentPinCodesList.add(DIGIT);
+				lastKeyDown = false;
+				return;
 			}
-			// Number
-			if (currentPinCode == DIGIT) {
-				digit++;
-				if (digit > 3) digit = 0;
-				if (shift > 0) shift = 0;
-				currentPinCode = ~(~currentPinCode | pin);
-				log.info("DIGIT: " + digit);
-			}
-			// Ensure the pin code sequence is correct.
-			// Shift or digit start a pin code sequence, so just reset,
-			currentPinCodesList.clear();
-			pinCodeOverflow = 0;
-			if (shift > 0) currentPinCodesList.add(SHIFT);
-			if (digit > 0) currentPinCodesList.add(DIGIT);
-			lastKeyDown = false;
-			return;
 		}
 		log.info("HERE: " + currentPinCode + ", " + currentPinCodesList.toString() + ", " + shift);
 
@@ -332,13 +336,13 @@ public class TextAreaBraille extends JTextArea {
 		newArr[1] = item2;
 		return newArr;
 	}
-/*
+
 	private static int[] join(int[] arr, int item) {
 		int[] newArr = Arrays.copyOf(arr, arr.length + 1);
 		newArr[arr.length] = item;
 		return newArr;
 	}
-
+/*
 	private static int[] join(int item, int[] arr) {
 		int[] newArr = new int[arr.length + 1];
 		newArr[0] = item;
@@ -441,9 +445,10 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(AT_SIGN, new KeyData('@', true));
 		addToBrailleMap(BACK_SLASH, new KeyData('\\', KeyEvent.VK_BACK_SLASH));
 		addToBrailleMap(CARET, new KeyData('^', true));
-
 		addToBrailleMap(COLON, new KeyData(':', KeyEvent.VK_COLON, true));
 		addToBrailleMap(COMMA, new KeyData(',', KeyEvent.VK_COMMA));
+		addToBrailleMap(DAGGER, new KeyData('†'));
+		addToBrailleMap(DOUBLE_DAGGER, new KeyData('‡'));
 		addToBrailleMap(EXCLAMATION, new KeyData('!', KeyEvent.VK_EXCLAMATION_MARK, true));
 		addToBrailleMap(FORWARD_SLASH, new KeyData('/', KeyEvent.VK_SLASH));
 		addToBrailleMap(FULLSTOP, new KeyData('.', KeyEvent.VK_PERIOD));
@@ -506,6 +511,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int SHIFT40 = 40;
 	public static final int SHIFT48 = 48;
 	public static final int SHIFT56 = 56;
+	public static final int[] SHIFT8_32 = join(SHIFT8, SHIFT32);
 	public static final int SHIFT = SHIFT32;
 	public static final int SPACE = -KeyEvent.VK_SPACE;
 	public static final int GROUP_OPEN = 35; // same as N2
@@ -629,6 +635,9 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] NAIRA = join(SHIFT8, An);
 	public static final int[] TILDE = join(SHIFT8, 20);
 	public static final int[] YEN = join(SHIFT8, Ay);
+	// SHIFT 8 -> SHIFT 32
+	public static final int[] DAGGER = join(SHIFT8_32, 57);
+	public static final int[] DOUBLE_DAGGER = join(SHIFT8_32, 59);
 
 	// SHIFT 56
 	public static final int[] BACK_SLASH = join(SHIFT56, 33);
