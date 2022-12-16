@@ -406,13 +406,22 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(EXCLAMATION, new KeyData('!', KeyEvent.VK_EXCLAMATION_MARK, true));
 		addToBrailleMap(FULLSTOP, new KeyData('.', KeyEvent.VK_PERIOD));
 		addToBrailleMap(MINUS, new KeyData('-', KeyEvent.VK_MINUS));
+		addToBrailleMap(PRIME, new KeyData('′'));
 		addToBrailleMap(QUESTION, new KeyData('?', true));
-		addToBrailleMap(QUOTE, new KeyData('"', true));
+		//addToBrailleMap(QUOTE, new KeyData('"', true));
 		addToBrailleMap(SEMICOLON, new KeyData(';', KeyEvent.VK_SEMICOLON));
 
 		// SHIFT PUNCTUATION
+		addToBrailleMap(ANGLE_BRACKET_OPEN, new KeyData('<', true));
+		addToBrailleMap(ANGLE_BRACKET_CLOSE, new KeyData('>', true));
 		addToBrailleMap(BACK_SLASH, new KeyData('\\', KeyEvent.VK_BACK_SLASH));
+		addToBrailleMap(CURLY_BRACKET_OPEN, new KeyData('{', true));
+		addToBrailleMap(CURLY_BRACKET_CLOSE, new KeyData('}', true));
 		addToBrailleMap(FORWARD_SLASH, new KeyData('/', KeyEvent.VK_SLASH));
+		addToBrailleMap(ROUND_BRACKET_OPEN, new KeyData('(', true));
+		addToBrailleMap(ROUND_BRACKET_CLOSE, new KeyData(')', true));
+		addToBrailleMap(SQUARE_BRACKET_OPEN, new KeyData('['));
+		addToBrailleMap(SQUARE_BRACKET_CLOSE, new KeyData(']'));
 		addToBrailleMap(UNDERSCORE, new KeyData('_', KeyEvent.VK_UNDERSCORE, true));
 
 		// ASCII CHARACTERS. Stored under the negative of their keycode.
@@ -440,6 +449,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int SHIFT24 = 24;
 	public static final int SHIFT32 = 32;
 	public static final int SHIFT40 = 40;
+	public static final int SHIFT48 = 48;
 	public static final int SHIFT56 = 56;
 	public static final int SHIFT = SHIFT32;
 	public static final int SPACE = -KeyEvent.VK_SPACE;
@@ -528,13 +538,23 @@ public class TextAreaBraille extends JTextArea {
 	public static final int FULLSTOP = 50;
 	public static final int HYPHEN = 36;
 	public static final int MINUS = 36;
+	public static final int PRIME = 54;
 	public static final int QUESTION = 38;
-	public static final int QUOTE = 8;
 	public static final int SEMICOLON = 6;
 
 	// SHIFT PUNCTUATION
+	public static final int GROUP_OPEM = 35; // same as N2
+	public static final int GROUP_CLOSE = 28;
+	public static final int[] ANGLE_BRACKET_OPEN = join(SHIFT8, GROUP_OPEM);
+	public static final int[] ANGLE_BRACKET_CLOSE = join(SHIFT8, GROUP_CLOSE);
 	public static final int[] BACK_SLASH = join(SHIFT56, 33);
+	public static final int[] CURLY_BRACKET_OPEN = join(SHIFT56, GROUP_OPEM);
+	public static final int[] CURLY_BRACKET_CLOSE = join(SHIFT56, GROUP_CLOSE);
 	public static final int[] FORWARD_SLASH = join(SHIFT56, 12);
-	public static final int[] UNDERSCORE = join(SHIFT, HYPHEN);
+	public static final int[] ROUND_BRACKET_OPEN = join(SHIFT16, GROUP_OPEM);
+	public static final int[] ROUND_BRACKET_CLOSE = join(SHIFT16, GROUP_CLOSE);
+	public static final int[] SQUARE_BRACKET_OPEN = join(SHIFT40, GROUP_OPEM);
+	public static final int[] SQUARE_BRACKET_CLOSE = join(SHIFT40, GROUP_CLOSE);
+	public static final int[] UNDERSCORE = join(SHIFT40, HYPHEN);
 
 }
