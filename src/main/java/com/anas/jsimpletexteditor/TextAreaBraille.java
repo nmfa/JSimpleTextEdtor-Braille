@@ -449,7 +449,7 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(EXCLAMATION, new KeyData('!', KeyEvent.VK_EXCLAMATION_MARK, true));
 		addToBrailleMap(FORWARD_SLASH, new KeyData('/', KeyEvent.VK_SLASH));
 		addToBrailleMap(FULLSTOP, new KeyData('.', KeyEvent.VK_PERIOD));
-		addToBrailleMap(MINUS, new KeyData('-', KeyEvent.VK_MINUS));
+		addToBrailleMap(HYPHEN, new KeyData('-', KeyEvent.VK_MINUS));
 		addToBrailleMap(NUMBER, new KeyData('#'));
 		addToBrailleMap(PRIME, new KeyData('′'));
 		addToBrailleMap(QUESTION, new KeyData('?', true));
@@ -480,6 +480,15 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(NAIRA, new KeyData('₦'));
 		addToBrailleMap(YEN, new KeyData('¥'));
 
+		// MATHS
+		addToBrailleMap(ASTERISK, new KeyData('*', KeyEvent.VK_ASTERISK, true));
+		addToBrailleMap(DITTO, new KeyData('"', true));
+		addToBrailleMap(DIVIDE, new KeyData('÷'));
+		addToBrailleMap(EQUALS, new KeyData('=', KeyEvent.VK_EQUALS));
+		addToBrailleMap(MINUS, new KeyData('-', KeyEvent.VK_MINUS));
+		addToBrailleMap(MULTIPLY, new KeyData('×'));
+		addToBrailleMap(PLUS, new KeyData('+', KeyEvent.VK_PLUS, true));
+	
 		// SYMBOLS
 		addToBrailleMap(AMPERSAND, new KeyData('&', true));
 		addToBrailleMap(AT_SIGN, new KeyData('@', true));
@@ -614,7 +623,6 @@ public class TextAreaBraille extends JTextArea {
 	public static final int EXCLAMATION = 22;
 	public static final int FULLSTOP = 50;
 	public static final int HYPHEN = 36;
-	public static final int MINUS = 36;
 	public static final int PRIME = 54;
 	public static final int QUESTION = 38;
 	public static final int SEMICOLON = 6;
@@ -650,6 +658,15 @@ public class TextAreaBraille extends JTextArea {
 	// SHIFT 8 -> SHIFT 32
 	public static final int[] DAGGER = join(SHIFT8_32, 57);
 	public static final int[] DOUBLE_DAGGER = join(SHIFT8_32, 59);
+
+	// SHIFT 16 / MATHS
+	public static final int[] ASTERISK = join(SHIFT16, 20);
+	public static final int[] DITTO = join(SHIFT16, 2);
+	public static final int[] DIVIDE = join(SHIFT16, 12);
+	public static final int[] EQUALS = join(SHIFT16, PRIME);
+	public static final int[] MINUS = join(SHIFT16, HYPHEN);
+	public static final int[] MULTIPLY = join(SHIFT16, QUESTION);
+	public static final int[] PLUS = join(SHIFT16, EXCLAMATION);
 
 	// SHIFT 24
 	public static final int[] COPYRIGHT = join(SHIFT24, Ac);
