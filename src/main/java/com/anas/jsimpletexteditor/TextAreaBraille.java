@@ -440,19 +440,17 @@ public class TextAreaBraille extends JTextArea {
         addToBrailleMap(SHARP, new KeyData('♯'));
 
 		// SIMPLE PUNCTUATION
-		addToBrailleMap(AMPERSAND, new KeyData('&', true));
 		addToBrailleMap(APOSTROPHE, new KeyData('\''));
-		addToBrailleMap(AT_SIGN, new KeyData('@', true));
 		addToBrailleMap(BACK_SLASH, new KeyData('\\', KeyEvent.VK_BACK_SLASH));
+		addToBrailleMap(BULLET, new KeyData('•'));
 		addToBrailleMap(CARET, new KeyData('^', true));
 		addToBrailleMap(COLON, new KeyData(':', KeyEvent.VK_COLON, true));
 		addToBrailleMap(COMMA, new KeyData(',', KeyEvent.VK_COMMA));
-		addToBrailleMap(DAGGER, new KeyData('†'));
-		addToBrailleMap(DOUBLE_DAGGER, new KeyData('‡'));
 		addToBrailleMap(EXCLAMATION, new KeyData('!', KeyEvent.VK_EXCLAMATION_MARK, true));
 		addToBrailleMap(FORWARD_SLASH, new KeyData('/', KeyEvent.VK_SLASH));
 		addToBrailleMap(FULLSTOP, new KeyData('.', KeyEvent.VK_PERIOD));
 		addToBrailleMap(MINUS, new KeyData('-', KeyEvent.VK_MINUS));
+		addToBrailleMap(NUMBER, new KeyData('#'));
 		addToBrailleMap(PRIME, new KeyData('′'));
 		addToBrailleMap(QUESTION, new KeyData('?', true));
 		//addToBrailleMap(QUOTE, new KeyData('"', true));
@@ -482,6 +480,20 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(NAIRA, new KeyData('₦'));
 		addToBrailleMap(YEN, new KeyData('¥'));
 
+		// SYMBOLS
+		addToBrailleMap(AMPERSAND, new KeyData('&', true));
+		addToBrailleMap(AT_SIGN, new KeyData('@', true));
+		addToBrailleMap(COPYRIGHT, new KeyData('©'));
+		addToBrailleMap(DAGGER, new KeyData('†'));
+		addToBrailleMap(DOUBLE_DAGGER, new KeyData('‡'));
+		addToBrailleMap(DEGREES, new KeyData('°'));
+		addToBrailleMap(FEMALE, new KeyData('♀'));
+		addToBrailleMap(MALE, new KeyData('♂'));
+		addToBrailleMap(PARAGRAPH, new KeyData('¶'));
+		addToBrailleMap(REGISTERED, new KeyData('®'));
+		addToBrailleMap(SECTION, new KeyData('§'));
+		addToBrailleMap(TRADEMARK, new KeyData('™'));
+
 		// ASCII CHARACTERS. Stored under the negative of their keycode.
         addToBrailleMap(-KeyEvent.VK_ENTER, brailleMap.get(ENTER).keyData);
         addToBrailleMap(-KeyEvent.VK_SPACE, KD_SPACE);
@@ -508,7 +520,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int SHIFT16 = 16;
 	public static final int SHIFT24 = 24;
 	public static final int SHIFT32 = 32;
-	public static final int SHIFT40 = 40;
+	public static final int SHIFT40 = 0;
 	public static final int SHIFT48 = 48;
 	public static final int SHIFT56 = 56;
 	public static final int[] SHIFT8_32 = join(SHIFT8, SHIFT32);
@@ -639,7 +651,19 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] DAGGER = join(SHIFT8_32, 57);
 	public static final int[] DOUBLE_DAGGER = join(SHIFT8_32, 59);
 
+	// SHIFT 24
+	public static final int[] COPYRIGHT = join(SHIFT24, Ac);
+	public static final int[] DEGREES = join(SHIFT24, Aj);
+	public static final int[] PARAGRAPH = join(SHIFT24, Ap);
+	public static final int[] REGISTERED = join(SHIFT24, Ar);
+	public static final int[] SECTION = join(SHIFT24, As);
+	public static final int[] TRADEMARK = join(SHIFT24, At);
+	public static final int[] FEMALE = join(SHIFT24, Ax);
+	public static final int[] MALE = join(SHIFT24, Ay);
+
 	// SHIFT 56
 	public static final int[] BACK_SLASH = join(SHIFT56, 33);
+	public static final int[] BULLET = join(SHIFT56, FULLSTOP);
 	public static final int[] FORWARD_SLASH = join(SHIFT56, 12);
+	public static final int[] NUMBER = join(SHIFT56, 57);
 }
