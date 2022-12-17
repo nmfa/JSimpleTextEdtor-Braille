@@ -487,6 +487,7 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(EQUALS, new KeyData('=', KeyEvent.VK_EQUALS));
 		addToBrailleMap(MINUS, new KeyData('-', KeyEvent.VK_MINUS));
 		addToBrailleMap(MULTIPLY, new KeyData('×'));
+		addToBrailleMap(PERCENT, new KeyData('%', true));
 		addToBrailleMap(PLUS, new KeyData('+', KeyEvent.VK_PLUS, true));
 	
 		// SYMBOLS
@@ -529,7 +530,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int SHIFT16 = 16;
 	public static final int SHIFT24 = 24;
 	public static final int SHIFT32 = 32;
-	public static final int SHIFT40 = 0;
+	public static final int SHIFT40 = 40;
 	public static final int SHIFT48 = 48;
 	public static final int SHIFT56 = 56;
 	public static final int[] SHIFT8_32 = join(SHIFT8, SHIFT32);
@@ -629,7 +630,6 @@ public class TextAreaBraille extends JTextArea {
 
 	// COMPLEX PUNCTUATION
 	public static final int[] DOUBLE_PRIME = join(PRIME, PRIME);
-	public static final int[] UNDERSCORE = join(SHIFT40, HYPHEN);
 
 	// GROUP PUNCTUATION
 	public static final int[] ANGLE_BRACKET_OPEN = join(SHIFT8, GROUP_OPEN);
@@ -677,6 +677,10 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] TRADEMARK = join(SHIFT24, At);
 	public static final int[] FEMALE = join(SHIFT24, Ax);
 	public static final int[] MALE = join(SHIFT24, Ay);
+
+	// SHIFT 40
+	public static final int[] PERCENT = join(SHIFT40, 52);
+	public static final int[] UNDERSCORE = join(SHIFT40, HYPHEN);
 
 	// SHIFT 56
 	public static final int[] BACK_SLASH = join(SHIFT56, 33);
