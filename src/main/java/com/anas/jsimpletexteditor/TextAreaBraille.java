@@ -79,6 +79,7 @@ public class TextAreaBraille extends JTextArea {
 	private ArrayList<Integer> currentPinCodesList = new ArrayList<Integer>();
     private boolean lastKeyDown = false;
 	private int shift = 0; // 0 = no shift, 1 = normal, 2 = word, 3 = Caps Lock
+	private int shift40 = 0;
 	private int digit = 0; // 0 = not a digit, 1 = normal, 2 = word, 3 = Num Lock
 	private int pinCodeOverflow = 0; // Depth of overflow when doing prime, double prime type examples.
 
@@ -129,9 +130,13 @@ public class TextAreaBraille extends JTextArea {
 			case KeyEvent.VK_BACK_SPACE:
 				sendKeyEvents(e.getComponent(), e. getWhen(), brailleMap.get(-keyCode).keyData);
 				if (shift < 3) shift = 0;
+				if (shift40 < 3) shift40 = 0;
 				if (digit < 3) digit = 0;
 				currentPinCodesList.clear();
 				if (shift > 0) currentPinCodesList.add(SHIFT);
+				//Shifts can combine, main shft first.
+				if (shift40 > 0) currentPinCodesList.add(SHIFT40);
+				// This should never combine with the shifts.
 				if (digit > 0) currentPinCodesList.add(DIGIT);
 				lastKeyDown = false;
 				return;
@@ -139,22 +144,37 @@ public class TextAreaBraille extends JTextArea {
 
 		// Getting engaged when it's the last key left of a larger combination, so only after a keyDown
 		// Can't have shift and digit engaged simultaneously, as they both use A-J.
-		if (lastKeyDown && (currentPinCode == SHIFT || currentPinCode == DIGIT)) {
+		if (lastKeyDown && 
+			(currentPinCode == SHIFT ||
+			 currentPinCode == SHIFT40 || 
+			 currentPinCode == DIGIT)) {
 			if (!(currentPinCodesList.size() > 0 && currentPinCodesList.get(0) == SHIFT8)) {
 				log.info("NOT SHIFT 8");
 				// Shift
 				if (currentPinCode == SHIFT) {
 					shift++;
 					if (shift > 3) shift = 0;
+					// Doesn't reset other shifts
 					if (digit > 0) digit = 0;
 					currentPinCode = 0;
 					log.info("SHIFT: " + shift);
+				}
+				// Shift 40
+				if (currentPinCode == SHIFT40) {
+					shift40++;
+					if (shift40 > 3) shift40 = 0;
+					// Doesn't reset other shifts
+					if (digit > 0) digit = 0;
+					currentPinCode = ~(~currentPinCode | pin);
+					log.info("SHIFT40: " + shift40);
 				}
 				// Number
 				if (currentPinCode == DIGIT) {
 					digit++;
 					if (digit > 3) digit = 0;
+					// Resets both shifts.
 					if (shift > 0) shift = 0;
+					if (shift40 > 0) shift40 = 0;
 					currentPinCode = ~(~currentPinCode | pin);
 					log.info("DIGIT: " + digit);
 				}
@@ -163,6 +183,7 @@ public class TextAreaBraille extends JTextArea {
 				currentPinCodesList.clear();
 				pinCodeOverflow = 0;
 				if (shift > 0) currentPinCodesList.add(SHIFT);
+				if (shift40 > 0) currentPinCodesList.add(SHIFT40);
 				if (digit > 0) currentPinCodesList.add(DIGIT);
 				lastKeyDown = false;
 				return;
@@ -182,8 +203,10 @@ public class TextAreaBraille extends JTextArea {
 					currentPinCodesList.clear();
 					pinCodeOverflow = 0;
 					if (shift == 1) shift = 0;
+					if (shift40 == 1) shift40 = 0;
 					if (digit == 1) digit = 0; 
 					if (shift > 0) currentPinCodesList.add(SHIFT);
+					if (shift40 > 0) currentPinCodesList.add(SHIFT40);
 					if (digit > 0) currentPinCodesList.add(DIGIT);
 					onKeyUp(e);
 				}
@@ -211,13 +234,16 @@ public class TextAreaBraille extends JTextArea {
 			// Deal with word locks of shift and digit
 			if (currentPinCode == ENTER || currentPinCode == SPACE) {
 				if (shift < 3) shift = 0;
+				if (shift40 < 3) shift40 = 0;
 				if (digit < 3) digit = 0;
 			}
 			if (shift == 1) shift = 0;
+			if (shift40 == 1) shift40 = 0;
 			if (digit == 1) digit = 0; 
 			// If shift or digit are locked, add to the pin code sequence now.
-			// They won't both be set.
+			// They won't both be set. Shifts can be set together.
 			if (shift > 0) currentPinCodesList.add(SHIFT);
+			if (shift40 > 0) currentPinCodesList.add(SHIFT40);
 			if (digit > 0) currentPinCodesList.add(DIGIT);
 		}
 
@@ -342,14 +368,14 @@ public class TextAreaBraille extends JTextArea {
 		newArr[arr.length] = item;
 		return newArr;
 	}
-/*
+
 	private static int[] join(int item, int[] arr) {
 		int[] newArr = new int[arr.length + 1];
 		newArr[0] = item;
 		System.arraycopy(arr, 0, newArr, 1, arr.length);
 		return newArr;
 	}
-*/
+
 
     private void  populateBrailleMaps() {
 		// SOME COMMON KEYEVENTS
@@ -656,7 +682,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] TILDE = join(SHIFT8, 20);
 	public static final int[] YEN = join(SHIFT8, Ay);
 	// SHIFT 8 -> SHIFT 32
-	public static final int[] DAGGER = join(SHIFT8_32, 57);
+	public static final int[] DAGGER = join(SHIFT8_32, N4);
 	public static final int[] DOUBLE_DAGGER = join(SHIFT8_32, 59);
 
 	// SHIFT 16 / MATHS
@@ -686,5 +712,55 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] BACK_SLASH = join(SHIFT56, 33);
 	public static final int[] BULLET = join(SHIFT56, FULLSTOP);
 	public static final int[] FORWARD_SLASH = join(SHIFT56, 12);
-	public static final int[] NUMBER = join(SHIFT56, 57);
+	public static final int[] NUMBER = join(SHIFT56, N4);
+
+	// GREEK ALPHABET
+	private static final int[] Galpha = join(SHIFT40, Aa);
+	private static final int[] Gbeta = join(SHIFT40, Ab);
+	private static final int[] Ggamma = join(SHIFT40, Ag);
+	private static final int[] Gdelta = join(SHIFT40, Ad);
+	private static final int[] Gepsilon = join(SHIFT40, Ae);
+	private static final int[] Gzeta = join(SHIFT40, Az);
+	private static final int[] Geta = join(SHIFT40, N5);
+	private static final int[] Gtheta = join(SHIFT40, N4);
+	private static final int[] Giota = join(SHIFT40, Ai);
+	private static final int[] Gkappa = join(SHIFT40, Ak);
+	private static final int[] Glambda = join(SHIFT40, Al);
+	private static final int[] Gmu = join(SHIFT40, Am);
+	private static final int[] Gnu = join(SHIFT40, An);
+	private static final int[] Gxi = join(SHIFT40, Ax);
+	private static final int[] Gomicron = join(SHIFT40, Ao);
+	private static final int[] Gpi = join(SHIFT40, Ap);
+	private static final int[] Grho = join(SHIFT40, Ar);
+	private static final int[] Gsigma = join(SHIFT40, As);
+	private static final int[] Gtau = join(SHIFT40, At);
+	private static final int[] Gupsilon = join(SHIFT40, Au);
+	private static final int[] Gphi = join(SHIFT40, Af);
+	private static final int[] Gchi = join(SHIFT40, 47);
+	private static final int[] Gpsi = join(SHIFT40, Ay);
+	private static final int[] Gomega = join(SHIFT40, Aw);
+	private static final int[] GALPHA = join(SHIFT, Galpha);
+	private static final int[] GBETA = join(SHIFT, Gbeta);
+	private static final int[] GGAMMA = join(SHIFT, Ggamma);
+	private static final int[] GDELTA = join(SHIFT, Gdelta);
+	private static final int[] GEPSILON = join(SHIFT, Gepsilon);
+	private static final int[] GZETA = join(SHIFT, Gzeta);
+	private static final int[] GETA = join(SHIFT, Geta);
+	private static final int[] GTHETA = join(SHIFT, Gtheta);
+	private static final int[] GIOTA = join(SHIFT, Giota);
+	private static final int[] GKAPPA = join(SHIFT, Gkappa);
+	private static final int[] GLAMBDA = join(SHIFT, Glambda);
+	private static final int[] GMU = join(SHIFT, Gmu);
+	private static final int[] GNU = join(SHIFT, Gnu);
+	private static final int[] GXI = join(SHIFT, Gxi);
+	private static final int[] GOMICRON = join(SHIFT, Gomicron);
+	private static final int[] GPI = join(SHIFT, Gpi);
+	private static final int[] GRHO = join(SHIFT, Grho);
+	private static final int[] GSIGMA = join(SHIFT, Gsigma);
+	private static final int[] GTAU = join(SHIFT, Gtau);
+	private static final int[] GUPSILON = join(SHIFT, Gupsilon);
+	private static final int[] GPHI = join(SHIFT, Gphi);
+	private static final int[] GCHI = join(SHIFT, Gchi);
+	private static final int[] GPSI = join(SHIFT, Gpsi);
+	private static final int[] GOMEGA = join(SHIFT, Gomega);
 }
