@@ -86,6 +86,8 @@ public class TextAreaBraille extends JTextArea {
     TextAreaBraille() {
         super();
         populateBrailleMaps();
+		// Initialise as if we've just had whitespace, arbitrarily ENTER.
+		currentPinCodesList.add(ENTER);
     }
 
     @Override
@@ -105,12 +107,13 @@ public class TextAreaBraille extends JTextArea {
 
 
 	private void onKeyDown(KeyEvent e) {
-		// Ignore for keyDown
+		// Almost gnore for keyDown
 		int keyCode = e.getKeyCode();
 		switch (keyCode) {
 			case KeyEvent.VK_ENTER:
 			case KeyEvent.VK_SPACE:
 			case KeyEvent.VK_BACK_SPACE:
+				lastKeyDown = true;
 				return;
 		}
 		Integer pin = keyPinMap.getOrDefault(keyCode, 0);
@@ -131,6 +134,7 @@ public class TextAreaBraille extends JTextArea {
 
 			case KeyEvent.VK_SPACE:
 				currentPinCode = SPACE;
+				break;
 
 			case KeyEvent.VK_BACK_SPACE:
 				sendKeyEvents(e.getComponent(), e. getWhen(), brailleMap.get(-keyCode).keyData);
@@ -185,8 +189,7 @@ public class TextAreaBraille extends JTextArea {
 				}
 				// Ensure the pin code sequence is correct.
 				// Shift or digit start a pin code sequence, so just reset,
-				currentPinCodesList.clear();
-				pinCodeOverflow = 0;
+				popModifiers();
 				if (shift > 0) currentPinCodesList.add(SHIFT);
 				if (shift40 > 0) currentPinCodesList.add(SHIFT40);
 				if (digit > 0) currentPinCodesList.add(DIGIT);
@@ -198,7 +201,7 @@ public class TextAreaBraille extends JTextArea {
 
         // If keyUp then find the assocaited MapData, if it exists.
         if (lastKeyDown) {
-			if (isWhitespace(currentPinCode)) removeModifiers();
+			if (isWhitespace(currentPinCode)) popModifiers();
 			currentPinCodesList.add(currentPinCode);
 			log.info("PIN CODE SEQUENCE: " + currentPinCodesList.toString());
 			MapData md = getMapDataFromPinCodes();
@@ -215,30 +218,43 @@ public class TextAreaBraille extends JTextArea {
 					if (shift40 > 0) currentPinCodesList.add(SHIFT40);
 					if (digit > 0) currentPinCodesList.add(DIGIT);
 					onKeyUp(e);
+					return;
 				}
 			} else if (md.keyData != null || md.map != null) {
 				if (md.keyData != null) {
 					// Send character sequence.
 					sendKeyEvents(e.getComponent(), e.getWhen(), md.keyData);
+					pinCodeOverflow = 0;
 				}
 				// We may possibly be doing a prime, double prime situation.
 				if (md.map != null) {
 					// Get next pin code.
-					currentPinCode = ~(~currentPinCode | pin);
-					lastKeyDown = false;
-					pinCodeOverflow++;
-					return;
+					pinCodeOverflow = currentPinCodesList.size();
 				}
 			} else {
 				// Something has gone wrong.
 				log.severe("FOuND EMPTY MAPDATA IN BRAILLE MAP.");
 			}
-			// Reset the pin code sequence, as one way or another it is done with.
-			currentPinCodesList.clear();
-			pinCodeOverflow = 0;
+
+			if (pinCodeOverflow == 0) {
+				// Reset the pin code sequence, as one way or another it is done with.
+				currentPinCodesList.clear();
+				pinCodeOverflow = 0;
+			}
+			// Unless WHITESPACE which is special case which terminate and start anoth overflow.
+			// I don't think any other character has this property.
+			// But this needs to happen regardless of the current overflow status.
+			// There shouldn't be any situations where ENTER will be in an existing oveeflow
+			// when ENTER is the current pin code.
+			if (isWhitespace(currentPinCode) &&
+				(currentPinCodesList.size() == 0 ||
+				 (currentPinCodesList.size() > 0 && !isWhitespace(currentPinCodesList.get(0))))) {
+				  currentPinCodesList.add(0, currentPinCode);
+				pinCodeOverflow++;
+			}
 
 			// Deal with word locks of shift and digit
-			if (currentPinCode == ENTER || currentPinCode == SPACE) {
+			if (isWhitespace(currentPinCode)) {
 				if (shift < 3) shift = 0;
 				if (shift40 < 3) shift40 = 0;
 				if (digit < 3) digit = 0;
@@ -253,24 +269,32 @@ public class TextAreaBraille extends JTextArea {
 			if (digit > 0) currentPinCodesList.add(DIGIT);
 		}
 
-		currentPinCode = ~(~currentPinCode | pin);
+		if (currentPinCode == SPACE) {
+			currentPinCode = 0;
+		} else {
+			currentPinCode = ~(~currentPinCode | pin);
+		}
 		lastKeyDown = false;
 	}
 
 
 	// Called with whitespace to remove preceding shifts and digits.
-	private void removeModifiers() {
+	private void popModifiers() {
+		if (currentPinCodesList.size() == 0) return;
 		int finalIndex = currentPinCodesList.size() - 1;
 		int finalPinCode = currentPinCodesList.get(finalIndex);
-		if (((finalPinCode & SHIFT56) > 0 && (finalPinCode & 199) == 0) || finalPinCode == DIGIT) {
+		if (((finalPinCode & SHIFT56) > 0 && (finalPinCode & ~SHIFT56) == 0) || finalPinCode == DIGIT) {
 			currentPinCodesList.remove(finalIndex);
 			// For shift combinations.
-			if (finalPinCode != DIGIT) removeModifiers();
+			if (finalPinCode != DIGIT) popModifiers();
 		}
 	}
 
 	private boolean isWhitespace(int pinCode) {
-		return (pinCode == ENTER || pinCode == SPACE);
+		for (int code: WHITESPACES) {
+			if (pinCode == code) return true;
+		}
+		return false;
 	}
 
 
@@ -351,6 +375,21 @@ public class TextAreaBraille extends JTextArea {
 	}
 
 	private void addToBrailleMap(int[] pinCodes, int pcIndex, ArrayList<KeyData> keyData, HashMap<Integer, MapData> map) {
+		// If we have WHITESPACE , then we need to set up trees for each one.
+		if (pinCodes[pcIndex] == WHITESPACE) {
+			// So far mappings only have one instance of a whitespace, so can keep simple.
+			int whitespaceIndex = keyData.indexOf(KD_WHITESPACE);
+			for (int i = 0; i < WHITESPACES.length; i++) {
+				pinCodes[pcIndex] = WHITESPACES[i];
+				if (whitespaceIndex >= 0) {
+					keyData = new ArrayList<KeyData>(keyData);
+					keyData.set(whitespaceIndex, KD_WHITESPACES[i]);
+				}
+				addToBrailleMap(pinCodes, pcIndex, keyData, map);
+			}
+			return;
+		}
+
 		MapData mapData =  map.get(pinCodes[pcIndex]);
 		if (mapData != null) {
 			if (pcIndex + 1 == pinCodes.length) {
@@ -405,11 +444,6 @@ public class TextAreaBraille extends JTextArea {
 
 
     private void  populateBrailleMaps() {
-		// SOME COMMON KEYEVENTS
-		final KeyData KD_BACKSPACE = new KeyData('\b', KeyEvent.VK_BACK_SPACE);
-		final KeyData KD_ENTER = new KeyData('\n', KeyEvent.VK_ENTER);
-		final KeyData KD_SPACE = new KeyData(' ', KeyEvent.VK_SPACE);
-
 		// LETTERS, PUNCTuATION
         addToBrailleMap(Aa, new KeyData('a'));
         addToBrailleMap(Ab, new KeyData('b'));
@@ -584,9 +618,8 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(Grho, new KeyData('ρ'));
 		final KeyData KD_sigma = new KeyData('σ');
 		addToBrailleMap(Gsigma, KD_sigma);
-		addToBrailleMap(join(SPACE, Gsigma), KD_sigma); // To prevent the nexy firing when just the letter σ.
-		addToBrailleMap(join(Gsigma, SPACE), KD_BACKSPACE, new KeyData('ς'), KD_SPACE); // Sigma at the end of a word.
-		addToBrailleMap(join(Gsigma, SHIFT40, SPACE), KD_BACKSPACE, new KeyData('ς'), KD_SPACE); // Sigma at the end of a word.
+		addToBrailleMap(join(WHITESPACE, Gsigma), KD_sigma); // To prevent the nexy firing when just the letter σ.
+		addToBrailleMap(join(Gsigma, WHITESPACE), KD_BACKSPACE, new KeyData('ς'), KD_WHITESPACE); // Sigma at the end of a word.
 		addToBrailleMap(Gtau, new KeyData('τ'));
 		addToBrailleMap(Gupsilon, new KeyData('υ'));
 		addToBrailleMap(Gphi, new KeyData('φ'));
@@ -631,6 +664,15 @@ public class TextAreaBraille extends JTextArea {
     }
 
 
+	public static final int WHITESPACE = 0;
+
+	// SOME COMMON KEYEVENTS
+	public static final KeyData KD_BACKSPACE = new KeyData('\b', KeyEvent.VK_BACK_SPACE);
+	public static final KeyData KD_ENTER = new KeyData('\n', KeyEvent.VK_ENTER);
+	public static final KeyData KD_SPACE = new KeyData(' ', KeyEvent.VK_SPACE);
+	public static final KeyData KD_WHITESPACE = new KeyData(' ', WHITESPACE);
+	public static final KeyData[] KD_WHITESPACES = { KD_SPACE, KD_ENTER };
+
 	// PINCODES
 	// SPECIAL
 	public static final int DIGIT = 60;
@@ -646,7 +688,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int SHIFT = SHIFT32;
 	public static final int[] MODIFIERS = join(DIGIT, SHIFT8, SHIFT16, SHIFT24, SHIFT32, SHIFT40, SHIFT48, SHIFT56);
 	public static final int SPACE = -KeyEvent.VK_SPACE;
-	public static final int WHITESPACE = 0;
+	public static final int[] WHITESPACES = join(SPACE, ENTER);  // Ordered by most used.
 	public static final int GROUP_OPEN = 35; // same as N2
 	public static final int GROUP_CLOSE = 28;
 
