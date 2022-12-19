@@ -126,7 +126,12 @@ public class TextAreaBraille extends JTextArea {
 		// Pass through. Reset shift below Caps Lock (3) for white space.
 		switch (keyCode) {
 			case KeyEvent.VK_ENTER:
+				currentPinCode = ENTER;
+				break;
+
 			case KeyEvent.VK_SPACE:
+				currentPinCode = SPACE;
+
 			case KeyEvent.VK_BACK_SPACE:
 				sendKeyEvents(e.getComponent(), e. getWhen(), brailleMap.get(-keyCode).keyData);
 				if (shift < 3) shift = 0;
@@ -193,6 +198,7 @@ public class TextAreaBraille extends JTextArea {
 
         // If keyUp then find the assocaited MapData, if it exists.
         if (lastKeyDown) {
+			if (isWhitespace(currentPinCode)) removeModifiers();
 			currentPinCodesList.add(currentPinCode);
 			log.info("PIN CODE SEQUENCE: " + currentPinCodesList.toString());
 			MapData md = getMapDataFromPinCodes();
@@ -249,6 +255,22 @@ public class TextAreaBraille extends JTextArea {
 
 		currentPinCode = ~(~currentPinCode | pin);
 		lastKeyDown = false;
+	}
+
+
+	// Called with whitespace to remove preceding shifts and digits.
+	private void removeModifiers() {
+		int finalIndex = currentPinCodesList.size() - 1;
+		int finalPinCode = currentPinCodesList.get(finalIndex);
+		if (((finalPinCode & SHIFT56) > 0 && (finalPinCode & 199) == 0) || finalPinCode == DIGIT) {
+			currentPinCodesList.remove(finalIndex);
+			// For shift combinations.
+			if (finalPinCode != DIGIT) removeModifiers();
+		}
+	}
+
+	private boolean isWhitespace(int pinCode) {
+		return (pinCode == ENTER || pinCode == SPACE);
 	}
 
 
@@ -309,9 +331,11 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(pinCodes, keyData);
 	}
 
-	private void addToBrailleMap(int[] pinCodes, KeyData keyData) {
+	private void addToBrailleMap(int[] pinCodes, KeyData... keyData) {
 		ArrayList<KeyData> keyDataAL = new ArrayList<KeyData>();
-		keyDataAL.add(keyData);
+		for (KeyData kd: keyData) {
+			keyDataAL.add(kd);
+		}
 		addToBrailleMap(pinCodes, keyDataAL);
 	}
 
@@ -356,16 +380,19 @@ public class TextAreaBraille extends JTextArea {
 	}
 
 
-	private static int[] join(int item1, int item2) {
-		int[] newArr = new int[2];
-		newArr[0] = item1;
-		newArr[1] = item2;
+	private static int[] join(int... items) {
+		int[] newArr = new int[items.length];
+		for (int index = 0; index < items.length; index++) {
+			newArr[index] = items[index];
+		}
 		return newArr;
 	}
 
-	private static int[] join(int[] arr, int item) {
-		int[] newArr = Arrays.copyOf(arr, arr.length + 1);
-		newArr[arr.length] = item;
+	private static int[] join(int[] arr, int... items) {
+		int[] newArr = Arrays.copyOf(arr, arr.length + items.length);
+		for (int index = 0; index < items.length; index++) {
+			newArr[arr.length + index] = items[index];
+		}
 		return newArr;
 	}
 
@@ -439,6 +466,8 @@ public class TextAreaBraille extends JTextArea {
         addToBrailleMap(ENTER, KD_ENTER);
         addToBrailleMap(join(DIGIT, ENTER), KD_ENTER);
         addToBrailleMap(join(SHIFT, ENTER), KD_ENTER);
+        addToBrailleMap(join(SHIFT40, ENTER), KD_ENTER);
+        addToBrailleMap(join(SHIFT, SHIFT40, ENTER), KD_ENTER);
 	
 		// NUMBERS
 		// COMPUTER NOTATION
@@ -535,6 +564,60 @@ public class TextAreaBraille extends JTextArea {
         addToBrailleMap(-KeyEvent.VK_SPACE, KD_SPACE);
     	addToBrailleMap(-KeyEvent.VK_BACK_SPACE, KD_BACKSPACE);
 
+		// GREEK ALPHABET
+		addToBrailleMap(Galpha, new KeyData('α'));
+		addToBrailleMap(Gbeta, new KeyData('β'));
+		addToBrailleMap(Ggamma, new KeyData('γ'));
+		addToBrailleMap(Gdelta, new KeyData('δ'));
+		addToBrailleMap(Gepsilon, new KeyData('ε'));
+		addToBrailleMap(Gzeta, new KeyData('ζ'));
+		addToBrailleMap(Geta, new KeyData('η'));
+		addToBrailleMap(Gtheta, new KeyData('θ'));
+		addToBrailleMap(Giota, new KeyData('ι'));
+		addToBrailleMap(Gkappa, new KeyData('κ'));
+		addToBrailleMap(Glambda, new KeyData('λ'));
+		addToBrailleMap(Gmu, new KeyData('μ'));
+		addToBrailleMap(Gnu, new KeyData('ν'));
+		addToBrailleMap(Gxi, new KeyData('ξ'));
+		addToBrailleMap(Gomicron, new KeyData('ο'));
+		addToBrailleMap(Gpi, new KeyData('π'));
+		addToBrailleMap(Grho, new KeyData('ρ'));
+		final KeyData KD_sigma = new KeyData('σ');
+		addToBrailleMap(Gsigma, KD_sigma);
+		addToBrailleMap(join(SPACE, Gsigma), KD_sigma); // To prevent the nexy firing when just the letter σ.
+		addToBrailleMap(join(Gsigma, SPACE), KD_BACKSPACE, new KeyData('ς'), KD_SPACE); // Sigma at the end of a word.
+		addToBrailleMap(join(Gsigma, SHIFT40, SPACE), KD_BACKSPACE, new KeyData('ς'), KD_SPACE); // Sigma at the end of a word.
+		addToBrailleMap(Gtau, new KeyData('τ'));
+		addToBrailleMap(Gupsilon, new KeyData('υ'));
+		addToBrailleMap(Gphi, new KeyData('φ'));
+		addToBrailleMap(Gchi, new KeyData('χ'));
+		addToBrailleMap(Gpsi, new KeyData('ψ'));
+		addToBrailleMap(Gomega, new KeyData('ω'));
+		addToBrailleMap(GALPHA, new KeyData('Α'));
+		addToBrailleMap(GBETA, new KeyData('Β'));
+		addToBrailleMap(GGAMMA, new KeyData('Γ'));
+		addToBrailleMap(GDELTA, new KeyData('Δ'));
+		addToBrailleMap(GEPSILON, new KeyData('Ε'));
+		addToBrailleMap(GZETA, new KeyData('Ζ'));
+		addToBrailleMap(GETA, new KeyData('Η'));
+		addToBrailleMap(GTHETA, new KeyData('Θ'));
+		addToBrailleMap(GIOTA, new KeyData('Ι'));
+		addToBrailleMap(GKAPPA, new KeyData('Κ'));
+		addToBrailleMap(GLAMBDA, new KeyData('Λ'));
+		addToBrailleMap(GMU, new KeyData('Μ'));
+		addToBrailleMap(GNU, new KeyData('Ν'));
+		addToBrailleMap(GXI, new KeyData('Ξ'));
+		addToBrailleMap(GOMICRON, new KeyData('Ο'));
+		addToBrailleMap(GPI, new KeyData('Π'));
+		addToBrailleMap(GRHO, new KeyData('Ρ'));
+		addToBrailleMap(GSIGMA, new KeyData('Σ'));
+		addToBrailleMap(GTAU, new KeyData('Τ'));
+		addToBrailleMap(GUPSILON, new KeyData('Υ'));
+		addToBrailleMap(GPHI, new KeyData('Φ'));
+		addToBrailleMap(GCHI, new KeyData('Χ'));
+		addToBrailleMap(GPSI, new KeyData('Ψ'));
+		addToBrailleMap(GOMEGA, new KeyData('Ω'));
+
 
 		// MAP REAL KEYBOARD TO PINS
         keyPinMap.put(70, 1);   // F
@@ -561,7 +644,9 @@ public class TextAreaBraille extends JTextArea {
 	public static final int SHIFT56 = 56;
 	public static final int[] SHIFT8_32 = join(SHIFT8, SHIFT32);
 	public static final int SHIFT = SHIFT32;
+	public static final int[] MODIFIERS = join(DIGIT, SHIFT8, SHIFT16, SHIFT24, SHIFT32, SHIFT40, SHIFT48, SHIFT56);
 	public static final int SPACE = -KeyEvent.VK_SPACE;
+	public static final int WHITESPACE = 0;
 	public static final int GROUP_OPEN = 35; // same as N2
 	public static final int GROUP_CLOSE = 28;
 
