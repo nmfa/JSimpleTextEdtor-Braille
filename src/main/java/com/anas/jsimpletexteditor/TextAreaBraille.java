@@ -370,6 +370,17 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(pinCodes, keyDataAL);
 	}
 
+	private void addAlphabetToBrailleMap() {
+		for (int i = 0; i < Alower.length; i++) {
+			addToBrailleMap(Alower[i], KD_Alower[i]);
+			addToBrailleMap(join(SHIFT, Alower[i]), KD_AUPPER[i]);
+		}
+	}
+
+	private void addCombiningCharsToBrailleMap(int[] combiningPinCode) {
+
+	}
+
 	private void addToBrailleMap(int[] pinCodes, ArrayList<KeyData> keyData) {
 		addToBrailleMap(pinCodes, 0, keyData, brailleMap);
 	}
@@ -427,6 +438,14 @@ public class TextAreaBraille extends JTextArea {
 		return newArr;
 	}
 
+	private static KeyData[] join(KeyData... items) {
+		KeyData[] newArr = new KeyData[items.length];
+		for (int index = 0; index < items.length; index++) {
+			newArr[index] = items[index];
+		}
+		return newArr;
+	}
+
 	private static int[] join(int[] arr, int... items) {
 		int[] newArr = Arrays.copyOf(arr, arr.length + items.length);
 		for (int index = 0; index < items.length; index++) {
@@ -444,60 +463,10 @@ public class TextAreaBraille extends JTextArea {
 
 
     private void  populateBrailleMaps() {
-		// LETTERS, PUNCTuATION
-        addToBrailleMap(Aa, new KeyData('a'));
-        addToBrailleMap(Ab, new KeyData('b'));
-        addToBrailleMap(Ac, new KeyData('c'));
-        addToBrailleMap(Ad, new KeyData('d'));
-        addToBrailleMap(Ae, new KeyData('e'));
-        addToBrailleMap(Af, new KeyData('f'));
-        addToBrailleMap(Ag, new KeyData('g'));
-        addToBrailleMap(Ah, new KeyData('h'));
-        addToBrailleMap(Ai, new KeyData('i'));
-        addToBrailleMap(Aj, new KeyData('j'));
-        addToBrailleMap(Ak, new KeyData('k'));
-        addToBrailleMap(Al, new KeyData('l'));
-        addToBrailleMap(Am, new KeyData('m'));
-        addToBrailleMap(An, new KeyData('n'));
-        addToBrailleMap(Ao, new KeyData('o'));
-        addToBrailleMap(Ap, new KeyData('p'));
-        addToBrailleMap(Aq, new KeyData('q'));
-        addToBrailleMap(Ar, new KeyData('r'));
-        addToBrailleMap(As, new KeyData('s'));
-        addToBrailleMap(At, new KeyData('t'));
-        addToBrailleMap(Au, new KeyData('u'));
-        addToBrailleMap(Av, new KeyData('v'));
-        addToBrailleMap(Aw, new KeyData('w'));
-        addToBrailleMap(Ax, new KeyData('x'));
-        addToBrailleMap(Ay, new KeyData('y'));
-        addToBrailleMap(Az, new KeyData('z'));
-        addToBrailleMap(AA, new KeyData('A', true));
-        addToBrailleMap(AB, new KeyData('B', true));
-        addToBrailleMap(AC, new KeyData('C', true));
-        addToBrailleMap(AD, new KeyData('D', true));
-        addToBrailleMap(AE, new KeyData('E', true));
-        addToBrailleMap(AF, new KeyData('F', true));
-        addToBrailleMap(AG, new KeyData('G', true));
-        addToBrailleMap(AH, new KeyData('H', true));
-        addToBrailleMap(AI, new KeyData('I', true));
-        addToBrailleMap(AJ, new KeyData('J', true));
-        addToBrailleMap(AK, new KeyData('K', true));
-        addToBrailleMap(AL, new KeyData('L', true));
-        addToBrailleMap(AM, new KeyData('M', true));
-        addToBrailleMap(AN, new KeyData('N', true));
-        addToBrailleMap(AO, new KeyData('O', true));
-        addToBrailleMap(AP, new KeyData('P', true));
-        addToBrailleMap(AQ, new KeyData('Q', true));
-        addToBrailleMap(AR, new KeyData('R', true));
-        addToBrailleMap(AS, new KeyData('S', true));
-        addToBrailleMap(AT, new KeyData('T', true));
-        addToBrailleMap(AU, new KeyData('U', true));
-        addToBrailleMap(AV, new KeyData('V', true));
-        addToBrailleMap(AW, new KeyData('W', true));
-        addToBrailleMap(AX, new KeyData('X', true));
-        addToBrailleMap(AY, new KeyData('Y', true));
-        addToBrailleMap(AZ, new KeyData('Z', true));
-        addToBrailleMap(ENTER, KD_ENTER);
+		// ENGLISH ALPHABET
+		addAlphabetToBrailleMap();
+
+		addToBrailleMap(ENTER, KD_ENTER);
         addToBrailleMap(join(DIGIT, ENTER), KD_ENTER);
         addToBrailleMap(join(SHIFT, ENTER), KD_ENTER);
         addToBrailleMap(join(SHIFT40, ENTER), KD_ENTER);
@@ -666,12 +635,70 @@ public class TextAreaBraille extends JTextArea {
 
 	public static final int WHITESPACE = 0;
 
-	// SOME COMMON KEYEVENTS
+	// SOME COMMON KEYDATA
 	public static final KeyData KD_BACKSPACE = new KeyData('\b', KeyEvent.VK_BACK_SPACE);
 	public static final KeyData KD_ENTER = new KeyData('\n', KeyEvent.VK_ENTER);
 	public static final KeyData KD_SPACE = new KeyData(' ', KeyEvent.VK_SPACE);
 	public static final KeyData KD_WHITESPACE = new KeyData(' ', WHITESPACE);
 	public static final KeyData[] KD_WHITESPACES = { KD_SPACE, KD_ENTER };
+
+	// STANDARD ALPHABET KEYDATA
+	public static final KeyData KD_Aa = new KeyData('a');
+	public static final KeyData KD_Ab = new KeyData('b');
+	public static final KeyData KD_Ac = new KeyData('c');
+	public static final KeyData KD_Ad = new KeyData('d');
+	public static final KeyData KD_Ae = new KeyData('e');
+	public static final KeyData KD_Af = new KeyData('f');
+	public static final KeyData KD_Ag = new KeyData('g');
+	public static final KeyData KD_Ah = new KeyData('h');
+	public static final KeyData KD_Ai = new KeyData('i');
+	public static final KeyData KD_Aj = new KeyData('j');
+	public static final KeyData KD_Ak = new KeyData('k');
+	public static final KeyData KD_Al = new KeyData('l');
+	public static final KeyData KD_Am = new KeyData('m');
+	public static final KeyData KD_An = new KeyData('n');
+	public static final KeyData KD_Ao = new KeyData('o');
+	public static final KeyData KD_Ap = new KeyData('p');
+	public static final KeyData KD_Aq = new KeyData('q');
+	public static final KeyData KD_Ar = new KeyData('r');
+	public static final KeyData KD_As = new KeyData('s');
+	public static final KeyData KD_At = new KeyData('t');
+	public static final KeyData KD_Au = new KeyData('u');
+	public static final KeyData KD_Av = new KeyData('v');
+	public static final KeyData KD_Aw = new KeyData('w');
+	public static final KeyData KD_Ax = new KeyData('x');
+	public static final KeyData KD_Ay = new KeyData('y');
+	public static final KeyData KD_Az = new KeyData('z');
+	public static final KeyData KD_AA = new KeyData('A', true);
+	public static final KeyData KD_AB = new KeyData('B', true);
+	public static final KeyData KD_AC = new KeyData('C', true);
+	public static final KeyData KD_AD = new KeyData('D', true);
+	public static final KeyData KD_AE = new KeyData('E', true);
+	public static final KeyData KD_AF = new KeyData('F', true);
+	public static final KeyData KD_AG = new KeyData('G', true);
+	public static final KeyData KD_AH = new KeyData('H', true);
+	public static final KeyData KD_AI = new KeyData('I', true);
+	public static final KeyData KD_AJ = new KeyData('J', true);
+	public static final KeyData KD_AK = new KeyData('K', true);
+	public static final KeyData KD_AL = new KeyData('L', true);
+	public static final KeyData KD_AM = new KeyData('M', true);
+	public static final KeyData KD_AN = new KeyData('N', true);
+	public static final KeyData KD_AO = new KeyData('O', true);
+	public static final KeyData KD_AP = new KeyData('P', true);
+	public static final KeyData KD_AQ = new KeyData('Q', true);
+	public static final KeyData KD_AR = new KeyData('R', true);
+	public static final KeyData KD_AS = new KeyData('S', true);
+	public static final KeyData KD_AT = new KeyData('T', true);
+	public static final KeyData KD_AU = new KeyData('U', true);
+	public static final KeyData KD_AV = new KeyData('V', true);
+	public static final KeyData KD_AW = new KeyData('W', true);
+	public static final KeyData KD_AX = new KeyData('X', true);
+	public static final KeyData KD_AY = new KeyData('Y', true);
+	public static final KeyData KD_AZ = new KeyData('Z', true);
+	public static final KeyData[] KD_Alower = join(KD_Aa, KD_Ab, KD_Ac, KD_Ad, KD_Ae, KD_Af, KD_Ag, KD_Ah, KD_Ai, KD_Aj, KD_Ak, KD_Al, KD_Am,
+												   KD_An, KD_Ao, KD_Ap, KD_Aq, KD_Ar, KD_As, KD_At, KD_Au, KD_Av, KD_Aw, KD_Ax, KD_Ay, KD_Az);
+	public static final KeyData[] KD_AUPPER = join(KD_AA, KD_AB, KD_AC, KD_AD, KD_AE, KD_AF, KD_AG, KD_AH, KD_AI, KD_AJ, KD_AK, KD_AL, KD_AM,
+												   KD_AN, KD_AO, KD_AP, KD_AQ, KD_AR, KD_AS, KD_AT, KD_AU, KD_AV, KD_AW, KD_AX, KD_AY, KD_AZ);
 
 	// PINCODES
 	// SPECIAL
@@ -686,6 +713,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int SHIFT56 = 56;
 	public static final int[] SHIFT8_32 = join(SHIFT8, SHIFT32);
 	public static final int SHIFT = SHIFT32;
+	public static final int GRADE1 = SHIFT48;
 	public static final int[] MODIFIERS = join(DIGIT, SHIFT8, SHIFT16, SHIFT24, SHIFT32, SHIFT40, SHIFT48, SHIFT56);
 	public static final int SPACE = -KeyEvent.VK_SPACE;
 	public static final int[] WHITESPACES = join(SPACE, ENTER);  // Ordered by most used.
@@ -745,6 +773,8 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] AX = join(SHIFT, Ax);
 	public static final int[] AY = join(SHIFT, Ay);
 	public static final int[] AZ = join(SHIFT, Az);
+	public static final int[] Alower = join(Aa, Ab, Ac, Ad, Ae, Af, Ag, Ah, Ai, Aj, Ak, Al, Am,
+											An, Ao, Ap, Aq, Ar, As, At, Au, Av, Aw, Ax, Ay, Az);
 
 	// NUMBERS
 	public static final int N0 = 63;
@@ -767,7 +797,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] D8 = join(DIGIT, Ah);
 	public static final int[] D9 = join(DIGIT, Ai);
 	public static final int[] D0 = join(DIGIT, Aj);
-	public static final int[] NATURAL = join(DIGIT, 33); // No Arial char
+	public static final int[] NATURAL = join(DIGIT, N1); // No Arial char
 	public static final int[] FLAT = join(DIGIT, GROUP_OPEN); // No Arial char
 	public static final int[] SHARP = join(DIGIT, 41);
 	// SIMPLE PUNCTUATION
@@ -808,6 +838,8 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] NAIRA = join(SHIFT8, An);
 	public static final int[] TILDE = join(SHIFT8, 20);
 	public static final int[] YEN = join(SHIFT8, Ay);
+	// SHIFT 8 - COMBINING CHARACTERS
+	public static final int[] SOLIDUS = join(SHIFT8, N1);
 	// SHIFT 8 -> SHIFT 32
 	public static final int[] DAGGER = join(SHIFT8_32, N4);
 	public static final int[] DOUBLE_DAGGER = join(SHIFT8_32, 59);
@@ -836,7 +868,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] UNDERSCORE = join(SHIFT40, HYPHEN);
 
 	// SHIFT 56
-	public static final int[] BACK_SLASH = join(SHIFT56, 33);
+	public static final int[] BACK_SLASH = join(SHIFT56, N1);
 	public static final int[] BULLET = join(SHIFT56, FULLSTOP);
 	public static final int[] FORWARD_SLASH = join(SHIFT56, 12);
 	public static final int[] NUMBER = join(SHIFT56, N4);
