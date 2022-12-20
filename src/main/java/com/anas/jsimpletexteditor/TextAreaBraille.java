@@ -2,6 +2,8 @@ package com.anas.jsimpletexteditor;
 
 import java.awt.Component;
 import java.awt.event.KeyEvent;
+import java.text.Normalizer;
+import java.text.Normalizer.Form;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -203,7 +205,7 @@ public class TextAreaBraille extends JTextArea {
         if (lastKeyDown) {
 			if (isWhitespace(currentPinCode)) popModifiers();
 			currentPinCodesList.add(currentPinCode);
-			log.info("PIN CODE SEQUENCE: " + currentPinCodesList.toString());
+			log.info("PIN CODE SEQUENCE: " + currentPinCodesList.toString() + ": " + pinCodeOverflow);
 			MapData md = getMapDataFromPinCodes();
 			if (md == null) {
 				// Invalid pin code sequence. Need to account for pin code overflows.
@@ -259,14 +261,17 @@ public class TextAreaBraille extends JTextArea {
 				if (shift40 < 3) shift40 = 0;
 				if (digit < 3) digit = 0;
 			}
-			if (shift == 1) shift = 0;
-			if (shift40 == 1) shift40 = 0;
-			if (digit == 1) digit = 0; 
-			// If shift or digit are locked, add to the pin code sequence now.
-			// They won't both be set. Shifts can be set together.
-			if (shift > 0) currentPinCodesList.add(SHIFT);
-			if (shift40 > 0) currentPinCodesList.add(SHIFT40);
-			if (digit > 0) currentPinCodesList.add(DIGIT);
+
+			if (pinCodeOverflow == 0) {
+				if (shift == 1) shift = 0;
+				if (shift40 == 1) shift40 = 0;
+				if (digit == 1) digit = 0; 
+				// If shift or digit are locked, add to the pin code sequence now.
+				// They won't both be set. Shifts can be set together.
+				if (shift > 0) currentPinCodesList.add(SHIFT);
+				if (shift40 > 0) currentPinCodesList.add(SHIFT40);
+				if (digit > 0) currentPinCodesList.add(DIGIT);
+			}
 		}
 
 		if (currentPinCode == SPACE) {
@@ -377,8 +382,22 @@ public class TextAreaBraille extends JTextArea {
 		}
 	}
 
-	private void addCombiningCharsToBrailleMap(int[] combiningPinCode) {
-
+	private void addCombiningCharsToBrailleMap() {
+		for (int c = 0; c < COMBINING.length; c++) {
+			for (int i = 0; i < Alower.length; i++) {
+				String combination = String.valueOf(KD_Alower[i].keyChar) + String.valueOf(KD_COMBINING[c].keyChar);
+				char keyChar = Normalizer.normalize(combination, Form.NFC).charAt(0);
+				// Not every combination is canonical and has a Unicode character.
+				if (keyChar != KD_Alower[i].keyChar) {
+					addToBrailleMap(join(COMBINING[c], Alower[i]), new KeyData(keyChar));
+				}
+				combination = String.valueOf(KD_AUPPER[i].keyChar) + String.valueOf(KD_COMBINING[c].keyChar);
+				keyChar = Normalizer.normalize(combination, Form.NFC).charAt(0);
+				if (keyChar != KD_AUPPER[i].keyChar) {
+					addToBrailleMap(join(SHIFT, COMBINING[c], Alower[i]), new KeyData(keyChar));
+				}
+			}
+		}
 	}
 
 	private void addToBrailleMap(int[] pinCodes, ArrayList<KeyData> keyData) {
@@ -388,6 +407,11 @@ public class TextAreaBraille extends JTextArea {
 	private void addToBrailleMap(int[] pinCodes, int pcIndex, ArrayList<KeyData> keyData, HashMap<Integer, MapData> map) {
 		// If we have WHITESPACE , then we need to set up trees for each one.
 		if (pinCodes[pcIndex] == WHITESPACE) {
+			if (pcIndex == 0) {
+				String sPinCodes = "";
+				for (int pc: pinCodes) sPinCodes += pc + " ";
+				log.info("WHITESPACE AT ZERO: " + sPinCodes);
+			}
 			// So far mappings only have one instance of a whitespace, so can keep simple.
 			int whitespaceIndex = keyData.indexOf(KD_WHITESPACE);
 			for (int i = 0; i < WHITESPACES.length; i++) {
@@ -405,9 +429,11 @@ public class TextAreaBraille extends JTextArea {
 		if (mapData != null) {
 			if (pcIndex + 1 == pinCodes.length) {
 				if (mapData.keyData != null) {
-					log.severe("DUPLICATE KEYCODE MAP: "  + pinCodes);
-					log.severe("    CURRENT: " + mapData.keyData);
-					log.severe("    DESIRED: " + keyData);
+					String sPinCodes = "";
+					for (int pc: pinCodes) sPinCodes += pc + " ";
+					log.severe("DUPLICATE KEYCODE MAP: "  + sPinCodes);
+					log.severe("    CURRENT: " + mapData.keyData.toString());
+					log.severe("    DESIRED: " + keyData.toString());
 				} else {
 					mapData.keyData = keyData;
 				}
@@ -431,26 +457,16 @@ public class TextAreaBraille extends JTextArea {
 
 
 	private static int[] join(int... items) {
-		int[] newArr = new int[items.length];
-		for (int index = 0; index < items.length; index++) {
-			newArr[index] = items[index];
-		}
-		return newArr;
+		return Arrays.copyOf(items, items.length);
 	}
 
 	private static KeyData[] join(KeyData... items) {
-		KeyData[] newArr = new KeyData[items.length];
-		for (int index = 0; index < items.length; index++) {
-			newArr[index] = items[index];
-		}
-		return newArr;
+		return Arrays.copyOf(items, items.length);
 	}
 
 	private static int[] join(int[] arr, int... items) {
 		int[] newArr = Arrays.copyOf(arr, arr.length + items.length);
-		for (int index = 0; index < items.length; index++) {
-			newArr[arr.length + index] = items[index];
-		}
+		System.arraycopy(items, 0, newArr, arr.length, items.length);
 		return newArr;
 	}
 
@@ -461,10 +477,15 @@ public class TextAreaBraille extends JTextArea {
 		return newArr;
 	}
 
+	private static int[] join(int item1, int[] arr, int... items2) {
+		return join(join(item1, arr), items2);
+	}
+
 
     private void  populateBrailleMaps() {
 		// ENGLISH ALPHABET
 		addAlphabetToBrailleMap();
+		addCombiningCharsToBrailleMap();
 
 		addToBrailleMap(ENTER, KD_ENTER);
         addToBrailleMap(join(DIGIT, ENTER), KD_ENTER);
@@ -700,6 +721,11 @@ public class TextAreaBraille extends JTextArea {
 	public static final KeyData[] KD_AUPPER = join(KD_AA, KD_AB, KD_AC, KD_AD, KD_AE, KD_AF, KD_AG, KD_AH, KD_AI, KD_AJ, KD_AK, KD_AL, KD_AM,
 												   KD_AN, KD_AO, KD_AP, KD_AQ, KD_AR, KD_AS, KD_AT, KD_AU, KD_AV, KD_AW, KD_AX, KD_AY, KD_AZ);
 
+	// COMBING CHARS KEYDATA
+	public static final KeyData KD_DIAERESIS = new KeyData('\u0308');
+	public static final KeyData KD_SOLIDUS = new KeyData('\u0338');
+	public static final KeyData[] KD_COMBINING = { KD_DIAERESIS, KD_SOLIDUS };
+
 	// PINCODES
 	// SPECIAL
 	public static final int DIGIT = 60;
@@ -862,6 +888,8 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] TRADEMARK = join(SHIFT24, At);
 	public static final int[] FEMALE = join(SHIFT24, Ax);
 	public static final int[] MALE = join(SHIFT24, Ay);
+	// SHIFT 24 - COMBINING CHARACTERS
+	public static final int[] DIAERESIS = join(SHIFT24, COLON);
 
 	// SHIFT 40
 	public static final int[] PERCENT = join(SHIFT40, 52);
@@ -922,4 +950,6 @@ public class TextAreaBraille extends JTextArea {
 	private static final int[] GCHI = join(SHIFT, Gchi);
 	private static final int[] GPSI = join(SHIFT, Gpsi);
 	private static final int[] GOMEGA = join(SHIFT, Gomega);
+
+	private static final int[][] COMBINING = { DIAERESIS, SOLIDUS };
 }
