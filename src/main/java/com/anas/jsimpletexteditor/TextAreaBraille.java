@@ -390,11 +390,15 @@ public class TextAreaBraille extends JTextArea {
 				// Not every combination is canonical and has a Unicode character.
 				if (keyChar != KD_Alower[i].keyChar) {
 					addToBrailleMap(join(COMBINING[c], Alower[i]), new KeyData(keyChar));
+				} else {
+					addToBrailleMap(join(COMBINING[c], Alower[i]), join(KD_Alower[i], KD_COMBINING[c]));
 				}
 				combination = String.valueOf(KD_AUPPER[i].keyChar) + String.valueOf(KD_COMBINING[c].keyChar);
 				keyChar = Normalizer.normalize(combination, Form.NFC).charAt(0);
 				if (keyChar != KD_AUPPER[i].keyChar) {
 					addToBrailleMap(join(SHIFT, COMBINING[c], Alower[i]), new KeyData(keyChar));
+				} else {
+					addToBrailleMap(join(SHIFT, COMBINING[c], Alower[i]), join(KD_AUPPER[i], KD_COMBINING[c]));
 				}
 			}
 		}
@@ -724,7 +728,8 @@ public class TextAreaBraille extends JTextArea {
 	// COMBING CHARS KEYDATA
 	public static final KeyData KD_DIAERESIS = new KeyData('\u0308');
 	public static final KeyData KD_SOLIDUS = new KeyData('\u0338');
-	public static final KeyData[] KD_COMBINING = { KD_DIAERESIS, KD_SOLIDUS };
+	public static final KeyData KD_STRIKETHROUGH = new KeyData('\u0336');
+	public static final KeyData[] KD_COMBINING = { KD_DIAERESIS, KD_SOLIDUS, KD_STRIKETHROUGH };
 
 	// PINCODES
 	// SPECIAL
@@ -866,6 +871,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] YEN = join(SHIFT8, Ay);
 	// SHIFT 8 - COMBINING CHARACTERS
 	public static final int[] SOLIDUS = join(SHIFT8, N1);
+	public static final int[] STRIKETHROUGH = join(SHIFT8, COLON);
 	// SHIFT 8 -> SHIFT 32
 	public static final int[] DAGGER = join(SHIFT8_32, N4);
 	public static final int[] DOUBLE_DAGGER = join(SHIFT8_32, 59);
@@ -900,6 +906,8 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] BULLET = join(SHIFT56, FULLSTOP);
 	public static final int[] FORWARD_SLASH = join(SHIFT56, 12);
 	public static final int[] NUMBER = join(SHIFT56, N4);
+
+	private static final int[][] COMBINING = { DIAERESIS, SOLIDUS, STRIKETHROUGH };
 
 	// GREEK ALPHABET
 	private static final int[] Galpha = join(SHIFT40, Aa);
@@ -950,6 +958,4 @@ public class TextAreaBraille extends JTextArea {
 	private static final int[] GCHI = join(SHIFT, Gchi);
 	private static final int[] GPSI = join(SHIFT, Gpsi);
 	private static final int[] GOMEGA = join(SHIFT, Gomega);
-
-	private static final int[][] COMBINING = { DIAERESIS, SOLIDUS };
 }
