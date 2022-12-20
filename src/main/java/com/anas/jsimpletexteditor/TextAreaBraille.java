@@ -726,6 +726,8 @@ public class TextAreaBraille extends JTextArea {
 												   KD_AN, KD_AO, KD_AP, KD_AQ, KD_AR, KD_AS, KD_AT, KD_AU, KD_AV, KD_AW, KD_AX, KD_AY, KD_AZ);
 
 	// COMBING CHARS KEYDATA
+	public static final KeyData KD_ACUTE = new KeyData('\u0301');
+	public static final KeyData KD_CARON = new KeyData('\u030C');
 	public static final KeyData KD_BREVE = new KeyData('\u0306');
 	public static final KeyData KD_CEDILLA = new KeyData('\u0327');
 	public static final KeyData KD_CIRCUMFLEX = new KeyData('\u0302');
@@ -737,7 +739,8 @@ public class TextAreaBraille extends JTextArea {
 	public static final KeyData KD_STRIKETHROUGH = new KeyData('\u0336');
 	public static final KeyData KD_TILDE_COMB = new KeyData('\u0303');
 	public static final KeyData[] KD_COMBINING = {
-		KD_BREVE, KD_CEDILLA, KD_CIRCUMFLEX, KD_DIAERESIS, KD_GRAVE, KD_MACRON, KD_RING, KD_SOLIDUS, KD_STRIKETHROUGH, KD_TILDE_COMB
+		KD_ACUTE, KD_CARON, KD_BREVE, KD_CEDILLA, KD_CIRCUMFLEX, KD_DIAERESIS, KD_GRAVE,
+		KD_MACRON, KD_RING, KD_SOLIDUS, KD_STRIKETHROUGH, KD_TILDE_COMB
 	};
 
 	// PINCODES
@@ -906,6 +909,8 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] FEMALE = join(SHIFT24, Ax);
 	public static final int[] MALE = join(SHIFT24, Ay);
 	// SHIFT 24 - COMBINING CHARACTERS
+	public static final int[] ACUTE = join(SHIFT24, 12);
+	public static final int[] CARON = join(SHIFT24, 44);
 	public static final int[] CEDILLA = join(SHIFT24, 47);
 	public static final int[] CIRCUMFLEX = join(SHIFT24, N3);
 	public static final int[] DIAERESIS = join(SHIFT24, COLON);
@@ -924,7 +929,8 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] NUMBER = join(SHIFT56, N4);
 
 	private static final int[][] COMBINING = {
-		BREVE, CEDILLA, CIRCUMFLEX, DIAERESIS, GRAVE, MACRON, RING, SOLIDUS, STRIKETHROUGH, TILDE_COMB
+		ACUTE, CARON, BREVE, CEDILLA, CIRCUMFLEX, DIAERESIS, GRAVE,
+		MACRON, RING, SOLIDUS, STRIKETHROUGH, TILDE_COMB
 	};
 
 	// GREEK ALPHABET
