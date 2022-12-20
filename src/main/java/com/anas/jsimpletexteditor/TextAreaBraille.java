@@ -303,6 +303,10 @@ public class TextAreaBraille extends JTextArea {
 		return false;
 	}
 
+	private boolean isAlphabet(int pinCode) {
+		return Alower.contains(pinCode);
+	}
+
 
 	private MapData getMapDataFromPinCodes() {
 		HashMap<Integer, MapData> map = brailleMap;
@@ -377,29 +381,29 @@ public class TextAreaBraille extends JTextArea {
 	}
 
 	private void addAlphabetToBrailleMap() {
-		for (int i = 0; i < Alower.length; i++) {
-			addToBrailleMap(Alower[i], KD_Alower[i]);
-			addToBrailleMap(join(SHIFT, Alower[i]), KD_AUPPER[i]);
+		for (int i = 0; i < Alower.size(); i++) {
+			addToBrailleMap(Alower.get(i), KD_Alower[i]);
+			addToBrailleMap(join(SHIFT, Alower.get(i)), KD_AUPPER[i]);
 		}
 	}
 
 	private void addCombiningCharsToBrailleMap() {
 		for (int c = 0; c < COMBINING.length; c++) {
-			for (int i = 0; i < Alower.length; i++) {
+			for (int i = 0; i < Alower.size(); i++) {
 				String combination = String.valueOf(KD_Alower[i].keyChar) + String.valueOf(KD_COMBINING[c].keyChar);
 				char keyChar = Normalizer.normalize(combination, Form.NFC).charAt(0);
 				// Not every combination is canonical and has a Unicode character.
 				if (keyChar != KD_Alower[i].keyChar) {
-					addToBrailleMap(join(COMBINING[c], Alower[i]), new KeyData(keyChar));
+					addToBrailleMap(join(COMBINING[c], Alower.get(i)), new KeyData(keyChar));
 				} else {
-					addToBrailleMap(join(COMBINING[c], Alower[i]), join(KD_Alower[i], KD_COMBINING[c]));
+					addToBrailleMap(join(COMBINING[c], Alower.get(i)), join(KD_Alower[i], KD_COMBINING[c]));
 				}
 				combination = String.valueOf(KD_AUPPER[i].keyChar) + String.valueOf(KD_COMBINING[c].keyChar);
 				keyChar = Normalizer.normalize(combination, Form.NFC).charAt(0);
 				if (keyChar != KD_AUPPER[i].keyChar) {
-					addToBrailleMap(join(SHIFT, COMBINING[c], Alower[i]), new KeyData(keyChar));
+					addToBrailleMap(join(SHIFT, COMBINING[c], Alower.get(i)), new KeyData(keyChar));
 				} else {
-					addToBrailleMap(join(SHIFT, COMBINING[c], Alower[i]), join(KD_AUPPER[i], KD_COMBINING[c]));
+					addToBrailleMap(join(SHIFT, COMBINING[c], Alower.get(i)), join(KD_AUPPER[i], KD_COMBINING[c]));
 				}
 			}
 		}
@@ -817,8 +821,10 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] AX = join(SHIFT, Ax);
 	public static final int[] AY = join(SHIFT, Ay);
 	public static final int[] AZ = join(SHIFT, Az);
-	public static final int[] Alower = join(Aa, Ab, Ac, Ad, Ae, Af, Ag, Ah, Ai, Aj, Ak, Al, Am,
-											An, Ao, Ap, Aq, Ar, As, At, Au, Av, Aw, Ax, Ay, Az);
+	public static final ArrayList<Integer> Alower = new ArrayList<Integer>(Arrays.asList(
+		Aa, Ab, Ac, Ad, Ae, Af, Ag, Ah, Ai, Aj, Ak, Al, Am,
+		An, Ao, Ap, Aq, Ar, As, At, Au, Av, Aw, Ax, Ay, Az
+	));
 
 	// NUMBERS
 	public static final int N0 = 63;
