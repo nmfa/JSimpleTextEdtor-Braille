@@ -727,11 +727,16 @@ public class TextAreaBraille extends JTextArea {
 
 	// COMBING CHARS KEYDATA
 	public static final KeyData KD_BREVE = new KeyData('\u0306');
+	public static final KeyData KD_CEDILLA = new KeyData('\u0327');
+	public static final KeyData KD_CIRCUMFLEX = new KeyData('\u0302');
 	public static final KeyData KD_DIAERESIS = new KeyData('\u0308');
+	public static final KeyData KD_GRAVE = new KeyData('\u0300');
 	public static final KeyData KD_MACRON = new KeyData('\u0305');
 	public static final KeyData KD_SOLIDUS = new KeyData('\u0338');
 	public static final KeyData KD_STRIKETHROUGH = new KeyData('\u0336');
-	public static final KeyData[] KD_COMBINING = { KD_BREVE, KD_DIAERESIS, KD_MACRON, KD_SOLIDUS, KD_STRIKETHROUGH };
+	public static final KeyData[] KD_COMBINING = {
+		KD_BREVE, KD_CEDILLA, KD_CIRCUMFLEX, KD_DIAERESIS, KD_GRAVE, KD_MACRON, KD_SOLIDUS, KD_STRIKETHROUGH
+	};
 
 	// PINCODES
 	// SPECIAL
@@ -832,7 +837,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] D0 = join(DIGIT, Aj);
 	public static final int[] NATURAL = join(DIGIT, N1); // No Arial char
 	public static final int[] FLAT = join(DIGIT, GROUP_OPEN); // No Arial char
-	public static final int[] SHARP = join(DIGIT, 41);
+	public static final int[] SHARP = join(DIGIT, N3);
 	// SIMPLE PUNCTUATION
 	public static final int APOSTROPHE = 4;
 	public static final int COLON = 18;
@@ -899,7 +904,10 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] FEMALE = join(SHIFT24, Ax);
 	public static final int[] MALE = join(SHIFT24, Ay);
 	// SHIFT 24 - COMBINING CHARACTERS
+	public static final int[] CEDILLA = join(SHIFT24, 47);
+	public static final int[] CIRCUMFLEX = join(SHIFT24, N3);
 	public static final int[] DIAERESIS = join(SHIFT24, COLON);
+	public static final int[] GRAVE = join(SHIFT24, N1);
 
 	// SHIFT 40
 	public static final int[] PERCENT = join(SHIFT40, 52);
@@ -911,7 +919,9 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] FORWARD_SLASH = join(SHIFT56, 12);
 	public static final int[] NUMBER = join(SHIFT56, N4);
 
-	private static final int[][] COMBINING = { BREVE, DIAERESIS, MACRON, SOLIDUS, STRIKETHROUGH };
+	private static final int[][] COMBINING = {
+		BREVE, CEDILLA, CIRCUMFLEX, DIAERESIS, GRAVE, MACRON, SOLIDUS, STRIKETHROUGH
+	};
 
 	// GREEK ALPHABET
 	private static final int[] Galpha = join(SHIFT40, Aa);
