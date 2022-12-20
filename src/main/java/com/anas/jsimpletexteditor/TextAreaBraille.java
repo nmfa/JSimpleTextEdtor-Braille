@@ -90,6 +90,7 @@ public class TextAreaBraille extends JTextArea {
         populateBrailleMaps();
 		// Initialise as if we've just had whitespace, arbitrarily ENTER.
 		currentPinCodesList.add(ENTER);
+		pinCodeOverflow = 1;
     }
 
     @Override
