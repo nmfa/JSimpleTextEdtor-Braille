@@ -732,10 +732,12 @@ public class TextAreaBraille extends JTextArea {
 	public static final KeyData KD_DIAERESIS = new KeyData('\u0308');
 	public static final KeyData KD_GRAVE = new KeyData('\u0300');
 	public static final KeyData KD_MACRON = new KeyData('\u0305');
+	public static final KeyData KD_RING = new KeyData('\u030A');
 	public static final KeyData KD_SOLIDUS = new KeyData('\u0338');
 	public static final KeyData KD_STRIKETHROUGH = new KeyData('\u0336');
+	public static final KeyData KD_TILDE_COMB = new KeyData('\u0303');
 	public static final KeyData[] KD_COMBINING = {
-		KD_BREVE, KD_CEDILLA, KD_CIRCUMFLEX, KD_DIAERESIS, KD_GRAVE, KD_MACRON, KD_SOLIDUS, KD_STRIKETHROUGH
+		KD_BREVE, KD_CEDILLA, KD_CIRCUMFLEX, KD_DIAERESIS, KD_GRAVE, KD_MACRON, KD_RING, KD_SOLIDUS, KD_STRIKETHROUGH, KD_TILDE_COMB
 	};
 
 	// PINCODES
@@ -883,7 +885,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] STRIKETHROUGH = join(SHIFT8, COLON);
 	// SHIFT 8 -> SHIFT 32
 	public static final int[] DAGGER = join(SHIFT8_32, N4);
-	public static final int[] DOUBLE_DAGGER = join(SHIFT8_32, 59);
+	public static final int[] DOUBLE_DAGGER = join(SHIFT8_32, N7);
 
 	// SHIFT 16 / MATHS
 	public static final int[] ASTERISK = join(SHIFT16, 20);
@@ -908,6 +910,8 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] CIRCUMFLEX = join(SHIFT24, N3);
 	public static final int[] DIAERESIS = join(SHIFT24, COLON);
 	public static final int[] GRAVE = join(SHIFT24, N1);
+	public static final int[] RING = join(SHIFT24, N6);
+	public static final int[] TILDE_COMB = join(SHIFT24, N7);
 
 	// SHIFT 40
 	public static final int[] PERCENT = join(SHIFT40, 52);
@@ -920,7 +924,7 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] NUMBER = join(SHIFT56, N4);
 
 	private static final int[][] COMBINING = {
-		BREVE, CEDILLA, CIRCUMFLEX, DIAERESIS, GRAVE, MACRON, SOLIDUS, STRIKETHROUGH
+		BREVE, CEDILLA, CIRCUMFLEX, DIAERESIS, GRAVE, MACRON, RING, SOLIDUS, STRIKETHROUGH, TILDE_COMB
 	};
 
 	// GREEK ALPHABET
