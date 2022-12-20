@@ -304,7 +304,7 @@ public class TextAreaBraille extends JTextArea {
 	}
 
 	private boolean isAlphabet(int pinCode) {
-		return Alower.contains(pinCode);
+		return ALPHABET.containsKey(pinCode);
 	}
 
 
@@ -381,29 +381,31 @@ public class TextAreaBraille extends JTextArea {
 	}
 
 	private void addAlphabetToBrailleMap() {
-		for (int i = 0; i < Alower.size(); i++) {
-			addToBrailleMap(Alower.get(i), KD_Alower[i]);
-			addToBrailleMap(join(SHIFT, Alower.get(i)), KD_AUPPER[i]);
+		for (int code: ALPHABET.keySet()) {
+			KeyData[] kd = ALPHABET.get(code);
+			addToBrailleMap(code, kd[LOWER]);
+			addToBrailleMap(join(SHIFT, code), kd[UPPER]);
 		}
 	}
 
 	private void addCombiningCharsToBrailleMap() {
 		for (int c = 0; c < COMBINING.length; c++) {
-			for (int i = 0; i < Alower.size(); i++) {
-				String combination = String.valueOf(KD_Alower[i].keyChar) + String.valueOf(KD_COMBINING[c].keyChar);
+			for (int code: ALPHABET.keySet()) {
+				KeyData[] kd = ALPHABET.get(code);
+				String combination = String.valueOf(kd[LOWER].keyChar) + String.valueOf(KD_COMBINING[c].keyChar);
 				char keyChar = Normalizer.normalize(combination, Form.NFC).charAt(0);
 				// Not every combination is canonical and has a Unicode character.
-				if (keyChar != KD_Alower[i].keyChar) {
-					addToBrailleMap(join(COMBINING[c], Alower.get(i)), new KeyData(keyChar));
+				if (keyChar != kd[LOWER].keyChar) {
+					addToBrailleMap(join(COMBINING[c], code), new KeyData(keyChar));
 				} else {
-					addToBrailleMap(join(COMBINING[c], Alower.get(i)), join(KD_Alower[i], KD_COMBINING[c]));
+					addToBrailleMap(join(COMBINING[c], code), join(kd[LOWER], KD_COMBINING[c]));
 				}
-				combination = String.valueOf(KD_AUPPER[i].keyChar) + String.valueOf(KD_COMBINING[c].keyChar);
+				combination = String.valueOf(kd[UPPER].keyChar) + String.valueOf(KD_COMBINING[c].keyChar);
 				keyChar = Normalizer.normalize(combination, Form.NFC).charAt(0);
-				if (keyChar != KD_AUPPER[i].keyChar) {
-					addToBrailleMap(join(SHIFT, COMBINING[c], Alower.get(i)), new KeyData(keyChar));
+				if (keyChar != kd[UPPER].keyChar) {
+					addToBrailleMap(join(SHIFT, COMBINING[c], code), new KeyData(keyChar));
 				} else {
-					addToBrailleMap(join(SHIFT, COMBINING[c], Alower.get(i)), join(KD_AUPPER[i], KD_COMBINING[c]));
+					addToBrailleMap(join(SHIFT, COMBINING[c], code), join(kd[UPPER], KD_COMBINING[c]));
 				}
 			}
 		}
@@ -725,10 +727,6 @@ public class TextAreaBraille extends JTextArea {
 	public static final KeyData KD_AX = new KeyData('X', true);
 	public static final KeyData KD_AY = new KeyData('Y', true);
 	public static final KeyData KD_AZ = new KeyData('Z', true);
-	public static final KeyData[] KD_Alower = join(KD_Aa, KD_Ab, KD_Ac, KD_Ad, KD_Ae, KD_Af, KD_Ag, KD_Ah, KD_Ai, KD_Aj, KD_Ak, KD_Al, KD_Am,
-												   KD_An, KD_Ao, KD_Ap, KD_Aq, KD_Ar, KD_As, KD_At, KD_Au, KD_Av, KD_Aw, KD_Ax, KD_Ay, KD_Az);
-	public static final KeyData[] KD_AUPPER = join(KD_AA, KD_AB, KD_AC, KD_AD, KD_AE, KD_AF, KD_AG, KD_AH, KD_AI, KD_AJ, KD_AK, KD_AL, KD_AM,
-												   KD_AN, KD_AO, KD_AP, KD_AQ, KD_AR, KD_AS, KD_AT, KD_AU, KD_AV, KD_AW, KD_AX, KD_AY, KD_AZ);
 
 	// COMBING CHARS KEYDATA
 	public static final KeyData KD_ACUTE = new KeyData('\u0301');
@@ -821,10 +819,37 @@ public class TextAreaBraille extends JTextArea {
 	public static final int[] AX = join(SHIFT, Ax);
 	public static final int[] AY = join(SHIFT, Ay);
 	public static final int[] AZ = join(SHIFT, Az);
-	public static final ArrayList<Integer> Alower = new ArrayList<Integer>(Arrays.asList(
-		Aa, Ab, Ac, Ad, Ae, Af, Ag, Ah, Ai, Aj, Ak, Al, Am,
-		An, Ao, Ap, Aq, Ar, As, At, Au, Av, Aw, Ax, Ay, Az
-	));
+	public static final HashMap<Integer, KeyData[]> ALPHABET = new HashMap<Integer, KeyData[]>();
+	static {
+		ALPHABET.put(Integer.valueOf(Aa), new KeyData[] {KD_Aa, KD_AA});
+		ALPHABET.put(Integer.valueOf(Ab), new KeyData[] {KD_Ab, KD_AB});
+		ALPHABET.put(Integer.valueOf(Ac), new KeyData[] {KD_Ac, KD_AC});
+		ALPHABET.put(Integer.valueOf(Ad), new KeyData[] {KD_Ad, KD_AD});
+		ALPHABET.put(Integer.valueOf(Ae), new KeyData[] {KD_Ae, KD_AE});
+		ALPHABET.put(Integer.valueOf(Af), new KeyData[] {KD_Af, KD_AF});
+		ALPHABET.put(Integer.valueOf(Ag), new KeyData[] {KD_Ag, KD_AG});
+		ALPHABET.put(Integer.valueOf(Ah), new KeyData[] {KD_Ah, KD_AH});
+		ALPHABET.put(Integer.valueOf(Ai), new KeyData[] {KD_Ai, KD_AI});
+		ALPHABET.put(Integer.valueOf(Aj), new KeyData[] {KD_Aj, KD_AJ});
+		ALPHABET.put(Integer.valueOf(Ak), new KeyData[] {KD_Ak, KD_AK});
+		ALPHABET.put(Integer.valueOf(Al), new KeyData[] {KD_Al, KD_AL});
+		ALPHABET.put(Integer.valueOf(Am), new KeyData[] {KD_Am, KD_AM});
+		ALPHABET.put(Integer.valueOf(An), new KeyData[] {KD_An, KD_AN});
+		ALPHABET.put(Integer.valueOf(Ao), new KeyData[] {KD_Ao, KD_AO});
+		ALPHABET.put(Integer.valueOf(Ap), new KeyData[] {KD_Ap, KD_AP});
+		ALPHABET.put(Integer.valueOf(Aq), new KeyData[] {KD_Aq, KD_AQ});
+		ALPHABET.put(Integer.valueOf(Ar), new KeyData[] {KD_Ar, KD_AR});
+		ALPHABET.put(Integer.valueOf(As), new KeyData[] {KD_As, KD_AS});
+		ALPHABET.put(Integer.valueOf(At), new KeyData[] {KD_At, KD_AT});
+		ALPHABET.put(Integer.valueOf(Au), new KeyData[] {KD_Au, KD_AU});
+		ALPHABET.put(Integer.valueOf(Av), new KeyData[] {KD_Av, KD_AV});
+		ALPHABET.put(Integer.valueOf(Aw), new KeyData[] {KD_Aw, KD_AW});
+		ALPHABET.put(Integer.valueOf(Ax), new KeyData[] {KD_Ax, KD_AX});
+		ALPHABET.put(Integer.valueOf(Ay), new KeyData[] {KD_Ay, KD_AY});
+		ALPHABET.put(Integer.valueOf(Az), new KeyData[] {KD_Az, KD_AZ});
+	}
+	public static final int LOWER = 0;
+	public static final int UPPER = 1;
 
 	// NUMBERS
 	public static final int N0 = 63;
