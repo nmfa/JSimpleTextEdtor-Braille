@@ -46,6 +46,9 @@ class MapData {
 		this.keyData = kd;
 		this.map = null;
 		this.type = tp;
+		if ((type & OVERFLOWS) > 0) {
+			this.map = new HashMap<Integer, MapData>();
+		}
 		if (type == OVERFLOWS) /*ONLY*/ {
 			log.severe("MAPDATA CONTAINING KEYDATA SHOULD HAVE A CONCRETE TYPE");
 		}
@@ -508,7 +511,7 @@ public class TextAreaBraille extends JTextArea {
 	private void addCombiningCharsToBrailleMap() {
 		for (Integer[] mCodes: MODIFIERS.keySet()) {
 			KeyData[] mKeyData = MODIFIERS.get(mCodes);
-			addToBrailleMap(mCodes, MapData.MODIFIER, mKeyData);
+			addToBrailleMap(mCodes, MapData.MODIFIER | MapData.OVERFLOWS, mKeyData);
 			for (int aCode: ALPHABET.keySet()) {
 				// THe expectation is that these will be pairs of lower and upper case modified characters.
 				boolean modifiedPair = false;
