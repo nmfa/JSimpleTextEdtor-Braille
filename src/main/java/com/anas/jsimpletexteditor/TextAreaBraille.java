@@ -107,14 +107,29 @@ class KeyData {
 public class TextAreaBraille extends JTextArea {
     private static Logger log = Logger.getLogger("TextAreaBraille");
 
+	private static enum LOCK {
+		OFF, CHAR, WORD, FULL {
+			@Override
+			public LOCK next() {
+				return values()[0];
+			};
+		};
+		public LOCK next() {return values()[ordinal() + 1];}
+		public LOCK charReset()  {return (ordinal() < 3) ? OFF : values()[ordinal()];}
+		public LOCK wordReset() {return (ordinal() < 3) ? OFF : FULL;}
+		public LOCK reset() {return OFF;}
+		public boolean isOn() {return ordinal() > 0;}
+	};
+
     private int currentPinCode = 0;
 	private ArrayList<Integer> currentPinCodesList = new ArrayList<Integer>();
     private boolean lastKeyDown = false;
 	private ArrayDeque<MapData> recentMapData = new ArrayDeque<MapData>(2);
 	private int wordLength = 0;
-	private int shift = 0; // 0 = no shift, 1 = normal, 2 = word, 3 = Caps Lock
-	private int shift40 = 0;
-	private int digit = 0; // 0 = not a digit, 1 = normal, 2 = word, 3 = Num Lock
+	private LOCK grade1 = LOCK.OFF;
+	private LOCK shift = LOCK.OFF;
+	private LOCK shift40 = LOCK.OFF;
+	private LOCK digit = LOCK.OFF;
 
     TextAreaBraille() {
         super();
@@ -173,15 +188,9 @@ public class TextAreaBraille extends JTextArea {
 			case KeyEvent.VK_BACK_SPACE:
 				sendKeyEvents(e.getComponent(), e. getWhen(), BRAILLE_MAP.get(-keyCode).keyData);
 				updateRecentMapData(BRAILLE_MAP.get(-keyCode));
-				if (shift < 3) shift = 0;
-				if (shift40 < 3) shift40 = 0;
-				if (digit < 3) digit = 0;
+				wordResets();
 				currentPinCodesList.clear();
-				if (shift > 0) currentPinCodesList.add(SHIFT);
-				//Shifts can combine, main shft first.
-				if (shift40 > 0) currentPinCodesList.add(SHIFT40);
-				// This should never combine with the shifts.
-				if (digit > 0) currentPinCodesList.add(DIGIT);
+				qualifyPinCode();
 				lastKeyDown = false;
 				return;
 		}
@@ -189,45 +198,40 @@ public class TextAreaBraille extends JTextArea {
 		// Getting engaged when it's the last key left of a larger combination, so only after a keyDown
 		// Can't have shift and digit engaged simultaneously, as they both use A-J.
 		if (lastKeyDown && 
-			(currentPinCode == SHIFT ||
+			(currentPinCode == GRADE1 ||
+			 currentPinCode == SHIFT ||
 			 currentPinCode == SHIFT40 || 
 			 currentPinCode == DIGIT)) {
 			if (!(currentPinCodesList.size() > 0 && currentPinCodesList.get(0) == SHIFT8)) {
-				log.info("NOT SHIFT 8");
-				// Shift
-				if (currentPinCode == SHIFT) {
-					shift++;
-					if (shift > 3) shift = 0;
+				if (currentPinCode == GRADE1) {
+					grade1 = grade1.next();
+					log.info("GRADE1: " + grade1);
+					// Doesn't reset shifts or digit as only affects contraction.
+				} else if (currentPinCode == SHIFT) {
+					shift = shift.next();
 					// Doesn't reset other shifts
-					if (digit > 0) digit = 0;
+					digit = digit.reset();
 					currentPinCode = 0;
 					log.info("SHIFT: " + shift);
-				}
-				// Shift 40
-				if (currentPinCode == SHIFT40) {
-					shift40++;
-					if (shift40 > 3) shift40 = 0;
+				} else if (currentPinCode == SHIFT40) {
+					shift40 = shift40.next();
 					// Doesn't reset other shifts
-					if (digit > 0) digit = 0;
+					digit = digit.reset();
 					currentPinCode = ~(~currentPinCode | pin);
 					log.info("SHIFT40: " + shift40);
-				}
-				// Number
-				if (currentPinCode == DIGIT) {
-					digit++;
-					if (digit > 3) digit = 0;
+					popQualifiers();
+					qualifyPinCode();
+					} else if (currentPinCode == DIGIT) {
+					digit = digit.next();
 					// Resets both shifts.
-					if (shift > 0) shift = 0;
-					if (shift40 > 0) shift40 = 0;
+					shift = shift.reset();
+					shift40 = shift40.reset();
 					currentPinCode = ~(~currentPinCode | pin);
 					log.info("DIGIT: " + digit);
+					popQualifiers();
+					qualifyPinCode();
 				}
-				// Ensure the pin code sequence is correct.
-				// Shift or digit start a pin code sequence, so just reset,
-				popModifiers();
-				if (shift > 0) currentPinCodesList.add(SHIFT);
-				if (shift40 > 0) currentPinCodesList.add(SHIFT40);
-				if (digit > 0) currentPinCodesList.add(DIGIT);
+
 				lastKeyDown = false;
 				return;
 			}
@@ -236,7 +240,7 @@ public class TextAreaBraille extends JTextArea {
 
         // If keyUp then find the assocaited MapData, if it exists.
         if (lastKeyDown) {
-			if (isWhitespace(currentPinCode)) popModifiers();
+			if (isWhitespace(currentPinCode)) popQualifiers();
 			currentPinCodesList.add(currentPinCode);
 			log.info("PIN CODE SEQUENCE: " + currentPinCodesList.toString());
 			MapData md = parsePinCodes();
@@ -245,12 +249,8 @@ public class TextAreaBraille extends JTextArea {
 				// This should only ever recurse once.
 				currentPinCodesList.clear();
 				//pinCodeOverflow = 0;
-				if (shift == 1) shift = 0;
-				if (shift40 == 1) shift40 = 0;
-				if (digit == 1) digit = 0;
-				if (shift > 0) currentPinCodesList.add(SHIFT);
-				if (shift40 > 0) currentPinCodesList.add(SHIFT40);
-				if (digit > 0) currentPinCodesList.add(DIGIT);
+				charResets();
+				qualifyPinCode();
 				// A good proxy for ensuring we don't wind up retrying the same failed code sequence.
 				if (currentPinCodesList.size() != originalPinCodesListLength - 1) {
 					onKeyUp(e);
@@ -263,7 +263,7 @@ public class TextAreaBraille extends JTextArea {
 			if (md.keyData != null) {
 				// Send character sequence.
 				if (md.isAlphabet()) {
-					int aCase = (shift > 0) ? UPPER : LOWER;
+					int aCase = (shift.isOn()) ? UPPER : LOWER;
 					sendKeyEvents(e.getComponent(), e.getWhen(), md.keyData.get(aCase));
 					wordLength++;
 				} else if (md.isFinal()) {
@@ -275,50 +275,26 @@ public class TextAreaBraille extends JTextArea {
 				}
 				updateRecentMapData(md);
 			}
-			// We may possibly be doing a prime, double prime situation.
-//			if (md.isOverflow()) {
-//				// Get next pin code.
-//				pinCodeOverflow = currentPinCodesList.size();
-//			}
-
 			//if (pinCodeOverflow == 0) {
 			if (!md.isOverflow()) {
 				// Reset the pin code sequence, as one way or another it is done with.
 				currentPinCodesList.clear();
 				//pinCodeOverflow = 0;
 			}
-			// Unless WHITESPACE which is special case which terminate and start anoth overflow.
-			// I don't think any other character has this property.
-			// But this needs to happen regardless of the current overflow status.
-			// There shouldn't be any situations where ENTER will be in an existing oveeflow
-			// when ENTER is the current pin code.
-			//if (isWhitespace(currentPinCode) &&
-//			if (md.isWhitespace() &&
-//				(currentPinCodesList.size() == 0 ||
-//				 (currentPinCodesList.size() > 0 && !isWhitespace(currentPinCodesList.get(0))))) {
-//				  currentPinCodesList.add(0, currentPinCode);
-//				pinCodeOverflow++;
-//			}
 
 			// Deal with word locks of shift and digit
 			//if (isWhitespace(currentPinCode)) {
 			if (md.isWhitespace()) {
-				if (shift < 3) shift = 0;
-				if (shift40 < 3) shift40 = 0;
-				if (digit < 3) digit = 0;
+				wordResets();
 				wordLength = 0;
 			}
 
 			//if (pinCodeOverflow == 0) {
 			if (!md.isOverflow()) {
-				if (shift == 1) shift = 0;
-				if (shift40 == 1) shift40 = 0;
-				if (digit == 1) digit = 0; 
+				charResets();
 				// If shift or digit are locked, add to the pin code sequence now.
 				// They won't both be set. Shifts can be set together.
-				if (shift > 0) currentPinCodesList.add(SHIFT);
-				if (shift40 > 0) currentPinCodesList.add(SHIFT40);
-				if (digit > 0) currentPinCodesList.add(DIGIT);
+				qualifyPinCode();
 			}
 		}
 
@@ -330,20 +306,39 @@ public class TextAreaBraille extends JTextArea {
 		lastKeyDown = false;
 	}
 
+	private void charResets() {
+		grade1 = grade1.charReset();
+		shift = shift.charReset();
+		shift40 = shift40.charReset();
+		digit = digit.charReset();
+	}
+
+	private void wordResets() {
+		grade1 = grade1.wordReset();
+		shift = shift.wordReset();
+		shift40 = shift40.wordReset();
+		digit = digit.wordReset();
+	}
+
+	private void qualifyPinCode() {
+		if (shift40.isOn()) currentPinCodesList.add(SHIFT40);
+		if (digit.isOn()) currentPinCodesList.add(DIGIT);
+	}
+
 	private void updateRecentMapData(MapData md) {
 		recentMapData.removeFirst();
 		recentMapData.addLast(md);
 	}
 
 	// Called with whitespace to remove preceding shifts and digits.
-	private void popModifiers() {
+	private void popQualifiers() {
 		if (currentPinCodesList.size() == 0) return;
 		int finalIndex = currentPinCodesList.size() - 1;
 		int finalPinCode = currentPinCodesList.get(finalIndex);
-		if (((finalPinCode & SHIFT56) > 0 && (finalPinCode & ~SHIFT56) == 0) || finalPinCode == DIGIT) {
+		if (((finalPinCode & SHIFT40) > 0 && (finalPinCode & ~SHIFT40) == 0) || finalPinCode == DIGIT) {
 			currentPinCodesList.remove(finalIndex);
 			// For shift combinations.
-			if (finalPinCode != DIGIT) popModifiers();
+			if (finalPinCode != DIGIT) popQualifiers();
 		}
 	}
 
@@ -381,16 +376,16 @@ public class TextAreaBraille extends JTextArea {
 		// I really want to pass and update this in a couple of helper functions.
 		// For such limited use this is probably the most efficient way, if a little ugly.
 		int[] pcIndex = {0};
-		int aCase = LOWER;
+		int aCase = (shift.isOn()) ? UPPER : LOWER;
 		MapData mdModifier = null;
 		MapData mdLigature = null;
 
 		// SHIFT always first code
-		if (currentPinCodesList.get(pcIndex[0]) == SHIFT) {
-			if (pinCodeCount == 1) return new MapData();
-			aCase = UPPER;
-			pcIndex[0]++;
-		}
+//		if (currentPinCodesList.get(pcIndex[0]) == SHIFT) {
+//			if (pinCodeCount == 1) return new MapData();
+//			aCase = UPPER;
+//			pcIndex[0]++;
+//		}
 
 		MapData md = null;
 		while (pcIndex[0] < pinCodeCount) {
@@ -407,9 +402,7 @@ public class TextAreaBraille extends JTextArea {
 						// Otherwise we need to start again with the final pincode.
 						Integer finalPinCode = currentPinCodesList.get(pinCodeCount-1);
 						currentPinCodesList.clear();
-						if (shift > 0) currentPinCodesList.add(SHIFT);
-						if (shift40 > 0) currentPinCodesList.add(SHIFT40);
-						if (digit > 0) currentPinCodesList.add(DIGIT);
+						qualifyPinCode();
 						currentPinCodesList.add(finalPinCode);
 						return parsePinCodes();
 					}
@@ -420,11 +413,11 @@ public class TextAreaBraille extends JTextArea {
 						MapData mdModified =
 							getModifiedAlphabet(mdModifier, currentPinCodesList.get(pinCodeCount-1));
 						if (mdModified == null) {
-							return new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.CHARACTER);
+							return new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.CHARACTER | MapData.MODIFIER);
 						} else {
 							// On rare combinations there is only a normalized char for one case.
 							if (mdModified.keyData.get(aCase).keyCode == 0) {
-								return new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.CHARACTER); 
+								return new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.CHARACTER | MapData.MODIFIER); 
 							} else {
 								return mdModified;
 							}
@@ -515,7 +508,7 @@ public class TextAreaBraille extends JTextArea {
 					log.warning("LOWER MODIFIED CHARACTER, BUT NO UPPER: " + aKeyData[UPPER].keyChar + String.format("\\u%04x", (int) mKeyData[0].keyChar));
 				}
 				if (modifiedPair) {
-					addToBrailleMap(join(mCodes, aCode), MapData.ALPHABET, pair);
+					addToBrailleMap(join(mCodes, aCode), MapData.ALPHABET | MapData.MODIFIER, pair);
 				}
 			}
 		}
