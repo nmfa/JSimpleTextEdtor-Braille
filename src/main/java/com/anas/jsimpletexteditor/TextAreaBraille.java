@@ -59,37 +59,15 @@ class MapData {
 		type = type | OVERFLOWS;
 	}
 
-	public boolean overflows() {
-		return (type & OVERFLOWS) > 0;
-	}
-
-	public boolean isConcrete() {
-		return (type & CONCRETE) > 0;
-	}
-
-	public boolean isFinal() {
-		return (type & FINAL) > 0;
-	}
-
-	public boolean isModifier() {
-		return (type & MODIFIER) > 0;
-	}
-
-	public boolean isAlphabet() {
-		return (type & ALPHABET) > 0;
-	}
-
-	public boolean isOverflow() {
-		return (type & OVERFLOWS) > 0;
-	}
-
-	public boolean isWhitespace() {
-		return (type & WHITESPACE) > 0;
-	}
-
-	public boolean isStandAloneMarker() {
-		return (type & STANDALONE) > 0;
-	}
+	public boolean overflows() {return (type & OVERFLOWS) > 0;}
+	public boolean isConcrete() {return (type & CONCRETE) > 0;}
+	public boolean isFinal() {return (type & FINAL) > 0;}
+	public boolean isModifier() {return (type & MODIFIER) > 0;}
+	public boolean isLigature() {return (type & LIGATURE) > 0;}
+	public boolean isAlphabet() {return (type & ALPHABET) > 0;}
+	public boolean isOverflow() {return (type & OVERFLOWS) > 0;}
+	public boolean isWhitespace() {return (type & WHITESPACE) > 0;}
+	public boolean isStandAloneMarker() {return (type & STANDALONE) > 0;}
 }
 
 class KeyData {
@@ -126,11 +104,7 @@ class KeyData {
 
 
 public class TextAreaBraille extends JTextArea {
-	// pinCode, MapData
-    private HashMap<Integer, MapData> brailleMap = new HashMap<Integer, MapData>();
-	// keyCode, pinCode bit
-    private HashMap<Integer, Integer> keyPinMap = new HashMap<Integer, Integer>();
-    Logger log = Logger.getLogger("TextAreaBraille");
+    private static Logger log = Logger.getLogger("TextAreaBraille");
 
     private int currentPinCode = 0;
 	private ArrayList<Integer> currentPinCodesList = new ArrayList<Integer>();
@@ -140,14 +114,10 @@ public class TextAreaBraille extends JTextArea {
 	private int shift = 0; // 0 = no shift, 1 = normal, 2 = word, 3 = Caps Lock
 	private int shift40 = 0;
 	private int digit = 0; // 0 = not a digit, 1 = normal, 2 = word, 3 = Num Lock
-	//private int pinCodeOverflow = 0; // Depth of overflow when doing prime, double prime type examples.
 
     TextAreaBraille() {
         super();
-        populateBrailleMaps();
 		// Initialise as if we've just had whitespace, arbitrarily ENTER.
-		//currentPinCodesList.add(ENTER);
-		//pinCodeOverflow = 1;
 		lastKeyDataSent = KD_ENTER;
     }
 
@@ -159,7 +129,7 @@ public class TextAreaBraille extends JTextArea {
 		if (e.getID() == KeyEvent.KEY_PRESSED) {
 			onKeyDown(e);
         } else if (e.getID() == KeyEvent.KEY_RELEASED) {
-			log.info("PROCESSING EVENT: " + currentPinCode + ", " + currentPinCodesList.toString() + ", " + keyPinMap.getOrDefault(e.getKeyCode(), 0));
+			log.info("PROCESSING EVENT: " + currentPinCode + ", " + currentPinCodesList.toString() + ", " + KEY_PIN_MAP.getOrDefault(e.getKeyCode(), 0));
 			onKeyUp(e);
 			log.info("PROCESSED: " + currentPinCode + ", " + currentPinCodesList.toString());
         } else {
@@ -178,7 +148,7 @@ public class TextAreaBraille extends JTextArea {
 				lastKeyDown = true;
 				return;
 		}
-		Integer pin = keyPinMap.getOrDefault(keyCode, 0);
+		Integer pin = KEY_PIN_MAP.getOrDefault(keyCode, 0);
 		currentPinCode = currentPinCode | pin;
 		lastKeyDown = true;
 	}
@@ -186,7 +156,7 @@ public class TextAreaBraille extends JTextArea {
 
 	private void onKeyUp(KeyEvent e) {
 		int keyCode = e.getKeyCode();
-		Integer pin = keyPinMap.getOrDefault(keyCode, 0);
+		Integer pin = KEY_PIN_MAP.getOrDefault(keyCode, 0);
 
 		// Pass through. Reset shift below Caps Lock (3) for white space.
 		switch (keyCode) {
@@ -199,7 +169,7 @@ public class TextAreaBraille extends JTextArea {
 				break;
 
 			case KeyEvent.VK_BACK_SPACE:
-				sendKeyEvents(e.getComponent(), e. getWhen(), brailleMap.get(-keyCode).keyData);
+				sendKeyEvents(e.getComponent(), e. getWhen(), BRAILLE_MAP.get(-keyCode).keyData);
 				if (shift < 3) shift = 0;
 				if (shift40 < 3) shift40 = 0;
 				if (digit < 3) digit = 0;
@@ -377,7 +347,7 @@ public class TextAreaBraille extends JTextArea {
 
 
 	private MapData __getMapDataFromBrailleMap(int[] pcIndex) {
-		return __getMapDataFromMap(pcIndex, brailleMap);
+		return __getMapDataFromMap(pcIndex, BRAILLE_MAP);
 	}
 
 	private MapData __getMapDataFromMap(int[] pcIndex, HashMap<Integer, MapData> map) {
@@ -404,6 +374,7 @@ public class TextAreaBraille extends JTextArea {
 		int[] pcIndex = {0};
 		int aCase = LOWER;
 		MapData mdModifier = null;
+		MapData mdLigature = null;
 
 		// SHIFT always first code
 		if (currentPinCodesList.get(pcIndex[0]) == SHIFT) {
@@ -456,9 +427,8 @@ public class TextAreaBraille extends JTextArea {
 					return md;
 				}
 			}
-			if (md.isModifier()) {
-				mdModifier = md;
-			}
+			if (md.isModifier()) mdModifier = md;
+			if (md.isLigature()) mdLigature = md;
 		}
 
 		return md;
@@ -498,7 +468,7 @@ public class TextAreaBraille extends JTextArea {
 	}
 
 
-	private void addAlphabetsToBrailleMap() {
+	private static void addAlphabetsToBrailleMap() {
 		for (Integer code: ALPHABET.keySet()) {
 			Integer[] codes = {code};
 			addToBrailleMap(codes, MapData.ALPHABET, ALPHABET.get(code));
@@ -508,7 +478,7 @@ public class TextAreaBraille extends JTextArea {
 		}
 	}
 
-	private void addCombiningCharsToBrailleMap() {
+	private static void addCombiningCharsToBrailleMap() {
 		for (Integer[] mCodes: MODIFIERS.keySet()) {
 			KeyData[] mKeyData = MODIFIERS.get(mCodes);
 			addToBrailleMap(mCodes, MapData.MODIFIER | MapData.OVERFLOWS, mKeyData);
@@ -543,34 +513,33 @@ public class TextAreaBraille extends JTextArea {
 		}
 	}
 
-	private void addCharToBrailleMap(Integer[] pinCodes, KeyData... keyData) {
+	private static void addCharToBrailleMap(Integer[] pinCodes, KeyData... keyData) {
 		addToBrailleMap(pinCodes, MapData.CHARACTER, keyData);
 	}
 
-	private void addCharToBrailleMap(Integer pinCode, KeyData... keyData) {
+	private static void addCharToBrailleMap(Integer pinCode, KeyData... keyData) {
 		Integer[] pinCodes = {pinCode};
 		addCharToBrailleMap(pinCodes, keyData);
 	}
 
-	private void addStandAloneToBrailleMap(Integer[] pinCodes, KeyData... keyData) {
+	private static void addStandAloneToBrailleMap(Integer[] pinCodes, KeyData... keyData) {
 		addToBrailleMap(pinCodes, MapData.CHARACTER | MapData.STANDALONE, keyData);
 	}
-	private void addStandAloneToBrailleMap(Integer pinCode, KeyData... keyData) {
+	private static void addStandAloneToBrailleMap(Integer pinCode, KeyData... keyData) {
 		Integer[] pinCodes = {pinCode};
 		addStandAloneToBrailleMap(pinCodes, keyData);
 	}
 
-
-	private void addWhitespaceToBrailleMap(Integer pinCode, KeyData... keyData) {
+	private static void addWhitespaceToBrailleMap(Integer pinCode, KeyData... keyData) {
 		Integer[] pinCodes = {pinCode};
 		addToBrailleMap(pinCodes, MapData.WHITESPACE | MapData.STANDALONE, keyData);
 	}
 
-	private void addToBrailleMap(Integer[] pinCodes, int type, KeyData... keyData) {
-		addToBrailleMap(pinCodes, type, 0, new ArrayList<KeyData>(Arrays.asList(keyData)), brailleMap);
+	private static void addToBrailleMap(Integer[] pinCodes, int type, KeyData... keyData) {
+		addToBrailleMap(pinCodes, type, 0, new ArrayList<KeyData>(Arrays.asList(keyData)), BRAILLE_MAP);
 	}
 
-	private void addToBrailleMap(Integer[] pinCodes, int type, int pcIndex, ArrayList<KeyData> keyData, HashMap<Integer, MapData> map) {
+	private static void addToBrailleMap(Integer[] pinCodes, int type, int pcIndex, ArrayList<KeyData> keyData, HashMap<Integer, MapData> map) {
 		MapData mapData =  map.get(pinCodes[pcIndex]);
 		if (mapData != null) {
 			if (pcIndex + 1 == pinCodes.length) {
@@ -614,10 +583,11 @@ public class TextAreaBraille extends JTextArea {
 	}
 
 
-    private void  populateBrailleMaps() {
+    private static void populateBrailleMap() {
 		// ENGLISH ALPHABET
 		addAlphabetsToBrailleMap();
 		addCombiningCharsToBrailleMap();
+		addToBrailleMap(LIGATURE, MapData.LIGATURE | MapData.OVERFLOWS, KD_LIGATURE);
 
 		addWhitespaceToBrailleMap(ENTER, KD_ENTER);
 		addWhitespaceToBrailleMap(SPACE, KD_SPACE);
@@ -711,212 +681,233 @@ public class TextAreaBraille extends JTextArea {
         addWhitespaceToBrailleMap(Integer.valueOf(-KeyEvent.VK_ENTER), KD_ENTER);
         //addWhitespaceToBrailleMap(Integer.valueOf(-KeyEvent.VK_SPACE), KD_SPACE);
     	addCharToBrailleMap(Integer.valueOf(-KeyEvent.VK_BACK_SPACE), KD_BACKSPACE);
+	}
 
+	private static final HashMap<Integer, Integer> KEY_PIN_MAP = new HashMap<Integer, Integer>();
+	static {
 		// MAP REAL KEYBOARD TO PINS
-        keyPinMap.put(70, 1);   // F
-        keyPinMap.put(68, 2);   // D
-        keyPinMap.put(83, 4);   // S
-        keyPinMap.put(74, 8);   // J
-        keyPinMap.put(75, 16);  // K
-        keyPinMap.put(76, 32);  // L
-        keyPinMap.put(65, 64);  // A
-        keyPinMap.put(59, 128); // ;
+        KEY_PIN_MAP.put(70, 1);   // F
+        KEY_PIN_MAP.put(68, 2);   // D
+        KEY_PIN_MAP.put(83, 4);   // S
+        KEY_PIN_MAP.put(74, 8);   // J
+        KEY_PIN_MAP.put(75, 16);  // K
+        KEY_PIN_MAP.put(76, 32);  // L
+        KEY_PIN_MAP.put(65, 64);  // A
+        KEY_PIN_MAP.put(59, 128); // ;
     }
 
-
-	public static final int WHITESPACE = 0;
-	public static final int WILDCARD = 63; // Same as N0
+	private static final int WHITESPACE = 0;
+	private static final int WILDCARD = 63; // Same as N0
 
 	// SOME COMMON KEYDATA
-	public static final KeyData KD_BACKSPACE = new KeyData('\b', KeyEvent.VK_BACK_SPACE);
-	public static final KeyData KD_ENTER = new KeyData('\n', KeyEvent.VK_ENTER);
-	public static final KeyData KD_SPACE = new KeyData(' ', KeyEvent.VK_SPACE);
-	public static final KeyData KD_WHITESPACE = new KeyData(' ', WHITESPACE);
-	public static final KeyData[] KD_WHITESPACES = { KD_SPACE, KD_ENTER };
+	private static final KeyData KD_BACKSPACE = new KeyData('\b', KeyEvent.VK_BACK_SPACE);
+	private static final KeyData KD_ENTER = new KeyData('\n', KeyEvent.VK_ENTER);
+	private static final KeyData KD_SPACE = new KeyData(' ', KeyEvent.VK_SPACE);
+	private static final KeyData KD_WHITESPACE = new KeyData(' ', WHITESPACE);
+	private static final KeyData[] KD_WHITESPACES = { KD_SPACE, KD_ENTER };
 
 	// STANDARD ALPHABET KEYDATA
-	public static final KeyData KD_Aa = new KeyData('a');
-	public static final KeyData KD_Ab = new KeyData('b');
-	public static final KeyData KD_Ac = new KeyData('c');
-	public static final KeyData KD_Ad = new KeyData('d');
-	public static final KeyData KD_Ae = new KeyData('e');
-	public static final KeyData KD_Af = new KeyData('f');
-	public static final KeyData KD_Ag = new KeyData('g');
-	public static final KeyData KD_Ah = new KeyData('h');
-	public static final KeyData KD_Ai = new KeyData('i');
-	public static final KeyData KD_Aj = new KeyData('j');
-	public static final KeyData KD_Ak = new KeyData('k');
-	public static final KeyData KD_Al = new KeyData('l');
-	public static final KeyData KD_Am = new KeyData('m');
-	public static final KeyData KD_An = new KeyData('n');
-	public static final KeyData KD_Ao = new KeyData('o');
-	public static final KeyData KD_Ap = new KeyData('p');
-	public static final KeyData KD_Aq = new KeyData('q');
-	public static final KeyData KD_Ar = new KeyData('r');
-	public static final KeyData KD_As = new KeyData('s');
-	public static final KeyData KD_At = new KeyData('t');
-	public static final KeyData KD_Au = new KeyData('u');
-	public static final KeyData KD_Av = new KeyData('v');
-	public static final KeyData KD_Aw = new KeyData('w');
-	public static final KeyData KD_Ax = new KeyData('x');
-	public static final KeyData KD_Ay = new KeyData('y');
-	public static final KeyData KD_Az = new KeyData('z');
-	public static final KeyData KD_AA = new KeyData('A', true);
-	public static final KeyData KD_AB = new KeyData('B', true);
-	public static final KeyData KD_AC = new KeyData('C', true);
-	public static final KeyData KD_AD = new KeyData('D', true);
-	public static final KeyData KD_AE = new KeyData('E', true);
-	public static final KeyData KD_AF = new KeyData('F', true);
-	public static final KeyData KD_AG = new KeyData('G', true);
-	public static final KeyData KD_AH = new KeyData('H', true);
-	public static final KeyData KD_AI = new KeyData('I', true);
-	public static final KeyData KD_AJ = new KeyData('J', true);
-	public static final KeyData KD_AK = new KeyData('K', true);
-	public static final KeyData KD_AL = new KeyData('L', true);
-	public static final KeyData KD_AM = new KeyData('M', true);
-	public static final KeyData KD_AN = new KeyData('N', true);
-	public static final KeyData KD_AO = new KeyData('O', true);
-	public static final KeyData KD_AP = new KeyData('P', true);
-	public static final KeyData KD_AQ = new KeyData('Q', true);
-	public static final KeyData KD_AR = new KeyData('R', true);
-	public static final KeyData KD_AS = new KeyData('S', true);
-	public static final KeyData KD_AT = new KeyData('T', true);
-	public static final KeyData KD_AU = new KeyData('U', true);
-	public static final KeyData KD_AV = new KeyData('V', true);
-	public static final KeyData KD_AW = new KeyData('W', true);
-	public static final KeyData KD_AX = new KeyData('X', true);
-	public static final KeyData KD_AY = new KeyData('Y', true);
-	public static final KeyData KD_AZ = new KeyData('Z', true);
+	private static final KeyData KD_Aa = new KeyData('a');
+	private static final KeyData KD_Ab = new KeyData('b');
+	private static final KeyData KD_Ac = new KeyData('c');
+	private static final KeyData KD_Ad = new KeyData('d');
+	private static final KeyData KD_Ae = new KeyData('e');
+	private static final KeyData KD_Af = new KeyData('f');
+	private static final KeyData KD_Ag = new KeyData('g');
+	private static final KeyData KD_Ah = new KeyData('h');
+	private static final KeyData KD_Ai = new KeyData('i');
+	private static final KeyData KD_Aj = new KeyData('j');
+	private static final KeyData KD_Ak = new KeyData('k');
+	private static final KeyData KD_Al = new KeyData('l');
+	private static final KeyData KD_Am = new KeyData('m');
+	private static final KeyData KD_An = new KeyData('n');
+	private static final KeyData KD_Ao = new KeyData('o');
+	private static final KeyData KD_Ap = new KeyData('p');
+	private static final KeyData KD_Aq = new KeyData('q');
+	private static final KeyData KD_Ar = new KeyData('r');
+	private static final KeyData KD_As = new KeyData('s');
+	private static final KeyData KD_At = new KeyData('t');
+	private static final KeyData KD_Au = new KeyData('u');
+	private static final KeyData KD_Av = new KeyData('v');
+	private static final KeyData KD_Aw = new KeyData('w');
+	private static final KeyData KD_Ax = new KeyData('x');
+	private static final KeyData KD_Ay = new KeyData('y');
+	private static final KeyData KD_Az = new KeyData('z');
+	private static final KeyData KD_AA = new KeyData('A', true);
+	private static final KeyData KD_AB = new KeyData('B', true);
+	private static final KeyData KD_AC = new KeyData('C', true);
+	private static final KeyData KD_AD = new KeyData('D', true);
+	private static final KeyData KD_AE = new KeyData('E', true);
+	private static final KeyData KD_AF = new KeyData('F', true);
+	private static final KeyData KD_AG = new KeyData('G', true);
+	private static final KeyData KD_AH = new KeyData('H', true);
+	private static final KeyData KD_AI = new KeyData('I', true);
+	private static final KeyData KD_AJ = new KeyData('J', true);
+	private static final KeyData KD_AK = new KeyData('K', true);
+	private static final KeyData KD_AL = new KeyData('L', true);
+	private static final KeyData KD_AM = new KeyData('M', true);
+	private static final KeyData KD_AN = new KeyData('N', true);
+	private static final KeyData KD_AO = new KeyData('O', true);
+	private static final KeyData KD_AP = new KeyData('P', true);
+	private static final KeyData KD_AQ = new KeyData('Q', true);
+	private static final KeyData KD_AR = new KeyData('R', true);
+	private static final KeyData KD_AS = new KeyData('S', true);
+	private static final KeyData KD_AT = new KeyData('T', true);
+	private static final KeyData KD_AU = new KeyData('U', true);
+	private static final KeyData KD_AV = new KeyData('V', true);
+	private static final KeyData KD_AW = new KeyData('W', true);
+	private static final KeyData KD_AX = new KeyData('X', true);
+	private static final KeyData KD_AY = new KeyData('Y', true);
+	private static final KeyData KD_AZ = new KeyData('Z', true);
+
+	// LIGATURES
+	private static final KeyData KD_Lae = new KeyData('æ');
+	private static final KeyData KD_LAE = new KeyData('Æ');
+	private static final KeyData KD_Lff = new KeyData('ﬀ');
+	private static final KeyData KD_Lffi = new KeyData('ﬃ');
+	private static final KeyData KD_Lffl = new KeyData('ﬄ');
+	private static final KeyData KD_Lfi = new KeyData('ﬁ');
+	private static final KeyData KD_Lfl = new KeyData('ﬂ');
+	private static final KeyData KD_Lft = new KeyData('ﬅ');
+	private static final KeyData KD_Lij = new KeyData('ĳ');
+	private static final KeyData KD_LIJ = new KeyData('Ĳ');
+	private static final KeyData KD_Loe = new KeyData('œ');
+	private static final KeyData KD_LOE = new KeyData('Œ');
+	private static final KeyData KD_Lth = new KeyData('þ');
+	private static final KeyData KD_LTH = new KeyData('Þ');
+	private static final KeyData KD_Lst = new KeyData('ﬆ');
+	private static final KeyData KD_Lue = new KeyData('ᵫ');
 
 	// HREEK ALPHABET
-	public static final KeyData KD_Galpha = new KeyData('α');
-	public static final KeyData KD_Gbeta = new KeyData('β');
-	public static final KeyData KD_Ggamma = new KeyData('γ');
-	public static final KeyData KD_Gdelta = new KeyData('δ');
-	public static final KeyData KD_Gepsilon = new KeyData('ε');
-	public static final KeyData KD_Gzeta = new KeyData('ζ');
-	public static final KeyData KD_Geta = new KeyData('η');
-	public static final KeyData KD_Gtheta = new KeyData('θ');
-	public static final KeyData KD_Giota = new KeyData('ι');
-	public static final KeyData KD_Gkappa = new KeyData('κ');
-	public static final KeyData KD_Glambda = new KeyData('λ');
-	public static final KeyData KD_Gmu = new KeyData('μ');
-	public static final KeyData KD_Gnu = new KeyData('ν');
-	public static final KeyData KD_Gxi = new KeyData('ξ');
-	public static final KeyData KD_Gomicron = new KeyData('ο');
-	public static final KeyData KD_Gpi = new KeyData('π');
-	public static final KeyData KD_Grho = new KeyData('ρ');
+	private static final KeyData KD_Galpha = new KeyData('α');
+	private static final KeyData KD_Gbeta = new KeyData('β');
+	private static final KeyData KD_Ggamma = new KeyData('γ');
+	private static final KeyData KD_Gdelta = new KeyData('δ');
+	private static final KeyData KD_Gepsilon = new KeyData('ε');
+	private static final KeyData KD_Gzeta = new KeyData('ζ');
+	private static final KeyData KD_Geta = new KeyData('η');
+	private static final KeyData KD_Gtheta = new KeyData('θ');
+	private static final KeyData KD_Giota = new KeyData('ι');
+	private static final KeyData KD_Gkappa = new KeyData('κ');
+	private static final KeyData KD_Glambda = new KeyData('λ');
+	private static final KeyData KD_Gmu = new KeyData('μ');
+	private static final KeyData KD_Gnu = new KeyData('ν');
+	private static final KeyData KD_Gxi = new KeyData('ξ');
+	private static final KeyData KD_Gomicron = new KeyData('ο');
+	private static final KeyData KD_Gpi = new KeyData('π');
+	private static final KeyData KD_Grho = new KeyData('ρ');
 	//final KeyData KD_sigma = new KeyData('σ');
-	public static final KeyData KD_Gsigma = new KeyData('σ');
-	//public static final KeyData KD_join(WHITESPACE = Gsigma) = KD_sigma); // To prevent the nexy firing when just the letter σ.
-	//public static final KeyData KD_join(Gsigma = WHITESPACE) = KD_BACKSPACE = new KeyData('ς') = KD_WHITESPACE); // Sigma at the end of a word.
-	public static final KeyData KD_Gtau = new KeyData('τ');
-	public static final KeyData KD_Gupsilon = new KeyData('υ');
-	public static final KeyData KD_Gphi = new KeyData('φ');
-	public static final KeyData KD_Gchi = new KeyData('χ');
-	public static final KeyData KD_Gpsi = new KeyData('ψ');
-	public static final KeyData KD_Gomega = new KeyData('ω');
-	public static final KeyData KD_GALPHA = new KeyData('Α');
-	public static final KeyData KD_GBETA = new KeyData('Β');
-	public static final KeyData KD_GGAMMA = new KeyData('Γ');
-	public static final KeyData KD_GDELTA = new KeyData('Δ');
-	public static final KeyData KD_GEPSILON = new KeyData('Ε');
-	public static final KeyData KD_GZETA = new KeyData('Ζ');
-	public static final KeyData KD_GETA = new KeyData('Η');
-	public static final KeyData KD_GTHETA = new KeyData('Θ');
-	public static final KeyData KD_GIOTA = new KeyData('Ι');
-	public static final KeyData KD_GKAPPA = new KeyData('Κ');
-	public static final KeyData KD_GLAMBDA = new KeyData('Λ');
-	public static final KeyData KD_GMU = new KeyData('Μ');
-	public static final KeyData KD_GNU = new KeyData('Ν');
-	public static final KeyData KD_GXI = new KeyData('Ξ');
-	public static final KeyData KD_GOMICRON = new KeyData('Ο');
-	public static final KeyData KD_GPI = new KeyData('Π');
-	public static final KeyData KD_GRHO = new KeyData('Ρ');
-	public static final KeyData KD_GSIGMA = new KeyData('Σ');
-	public static final KeyData KD_GTAU = new KeyData('Τ');
-	public static final KeyData KD_GUPSILON = new KeyData('Υ');
-	public static final KeyData KD_GPHI = new KeyData('Φ');
-	public static final KeyData KD_GCHI = new KeyData('Χ');
-	public static final KeyData KD_GPSI = new KeyData('Ψ');
-	public static final KeyData KD_GOMEGA = new KeyData('Ω');
+	private static final KeyData KD_Gsigma = new KeyData('σ');
+	//private static final KeyData KD_join(WHITESPACE = Gsigma) = KD_sigma); // To prevent the nexy firing when just the letter σ.
+	//private static final KeyData KD_join(Gsigma = WHITESPACE) = KD_BACKSPACE = new KeyData('ς') = KD_WHITESPACE); // Sigma at the end of a word.
+	private static final KeyData KD_Gtau = new KeyData('τ');
+	private static final KeyData KD_Gupsilon = new KeyData('υ');
+	private static final KeyData KD_Gphi = new KeyData('φ');
+	private static final KeyData KD_Gchi = new KeyData('χ');
+	private static final KeyData KD_Gpsi = new KeyData('ψ');
+	private static final KeyData KD_Gomega = new KeyData('ω');
+	private static final KeyData KD_GALPHA = new KeyData('Α');
+	private static final KeyData KD_GBETA = new KeyData('Β');
+	private static final KeyData KD_GGAMMA = new KeyData('Γ');
+	private static final KeyData KD_GDELTA = new KeyData('Δ');
+	private static final KeyData KD_GEPSILON = new KeyData('Ε');
+	private static final KeyData KD_GZETA = new KeyData('Ζ');
+	private static final KeyData KD_GETA = new KeyData('Η');
+	private static final KeyData KD_GTHETA = new KeyData('Θ');
+	private static final KeyData KD_GIOTA = new KeyData('Ι');
+	private static final KeyData KD_GKAPPA = new KeyData('Κ');
+	private static final KeyData KD_GLAMBDA = new KeyData('Λ');
+	private static final KeyData KD_GMU = new KeyData('Μ');
+	private static final KeyData KD_GNU = new KeyData('Ν');
+	private static final KeyData KD_GXI = new KeyData('Ξ');
+	private static final KeyData KD_GOMICRON = new KeyData('Ο');
+	private static final KeyData KD_GPI = new KeyData('Π');
+	private static final KeyData KD_GRHO = new KeyData('Ρ');
+	private static final KeyData KD_GSIGMA = new KeyData('Σ');
+	private static final KeyData KD_GTAU = new KeyData('Τ');
+	private static final KeyData KD_GUPSILON = new KeyData('Υ');
+	private static final KeyData KD_GPHI = new KeyData('Φ');
+	private static final KeyData KD_GCHI = new KeyData('Χ');
+	private static final KeyData KD_GPSI = new KeyData('Ψ');
+	private static final KeyData KD_GOMEGA = new KeyData('Ω');
 
 	// NUMBERS
-	public static final KeyData KD_0 = new KeyData('0');
-	public static final KeyData KD_1 = new KeyData('1');
-	public static final KeyData KD_2 = new KeyData('2');
-	public static final KeyData KD_3 = new KeyData('3');
-	public static final KeyData KD_4 = new KeyData('4');
-	public static final KeyData KD_5 = new KeyData('5');
-	public static final KeyData KD_6 = new KeyData('6');
-	public static final KeyData KD_7 = new KeyData('7');
-	public static final KeyData KD_8 = new KeyData('8');
-	public static final KeyData KD_9 = new KeyData('9');
+	private static final KeyData KD_0 = new KeyData('0');
+	private static final KeyData KD_1 = new KeyData('1');
+	private static final KeyData KD_2 = new KeyData('2');
+	private static final KeyData KD_3 = new KeyData('3');
+	private static final KeyData KD_4 = new KeyData('4');
+	private static final KeyData KD_5 = new KeyData('5');
+	private static final KeyData KD_6 = new KeyData('6');
+	private static final KeyData KD_7 = new KeyData('7');
+	private static final KeyData KD_8 = new KeyData('8');
+	private static final KeyData KD_9 = new KeyData('9');
 
 	// COMBING CHARS KEYDATA
-	public static final KeyData KD_ACUTE = new KeyData('\u0301');
-	public static final KeyData KD_CARON = new KeyData('\u030C');
-	public static final KeyData KD_BREVE = new KeyData('\u0306');
-	public static final KeyData KD_CEDILLA = new KeyData('\u0327');
-	public static final KeyData KD_CIRCUMFLEX = new KeyData('\u0302');
-	public static final KeyData KD_DIAERESIS = new KeyData('\u0308');
-	public static final KeyData KD_GRAVE = new KeyData('\u0300');
-	public static final KeyData KD_MACRON = new KeyData('\u0305');
-	public static final KeyData KD_RING = new KeyData('\u030A');
-	public static final KeyData KD_SOLIDUS = new KeyData('\u0338');
-	public static final KeyData KD_STRIKETHROUGH = new KeyData('\u0336');
-	public static final KeyData KD_TILDE_COMB = new KeyData('\u0303');
+	private static final KeyData KD_ACUTE = new KeyData('\u0301');
+	private static final KeyData KD_CARON = new KeyData('\u030C');
+	private static final KeyData KD_BREVE = new KeyData('\u0306');
+	private static final KeyData KD_CEDILLA = new KeyData('\u0327');
+	private static final KeyData KD_CIRCUMFLEX = new KeyData('\u0302');
+	private static final KeyData KD_DIAERESIS = new KeyData('\u0308');
+	private static final KeyData KD_GRAVE = new KeyData('\u0300');
+	private static final KeyData KD_MACRON = new KeyData('\u0305');
+	private static final KeyData KD_RING = new KeyData('\u030A');
+	private static final KeyData KD_SOLIDUS = new KeyData('\u0338');
+	private static final KeyData KD_STRIKETHROUGH = new KeyData('\u0336');
+	private static final KeyData KD_TILDE_COMB = new KeyData('\u0303');
+	private static final KeyData[] KD_LIGATURE = join(new KeyData('\uFE20'), new KeyData('\uFE21'));
 
 	// QUALIFIERS
-	public static final Integer DIGIT = 60;
-	public static final Integer SHIFT8 = 8;
-	public static final Integer SHIFT16 = 16;
-	public static final Integer SHIFT24 = 24;
-	public static final Integer SHIFT32 = 32;
-	public static final Integer SHIFT40 = 40;
-	public static final Integer SHIFT48 = 48;
-	public static final Integer SHIFT56 = 56;
-	public static final Integer SHIFT = SHIFT32;
-	public static final Integer GRADE1 = SHIFT48;
-	public static final Integer[] QUALIFIERS = join(DIGIT, SHIFT8, SHIFT16, SHIFT24, SHIFT32, SHIFT40, SHIFT48, SHIFT56);
+	private static final Integer DIGIT = 60;
+	private static final Integer SHIFT8 = 8;
+	private static final Integer SHIFT16 = 16;
+	private static final Integer SHIFT24 = 24;
+	private static final Integer SHIFT32 = 32;
+	private static final Integer SHIFT40 = 40;
+	private static final Integer SHIFT48 = 48;
+	private static final Integer SHIFT56 = 56;
+	private static final Integer SHIFT = SHIFT32;
+	private static final Integer GRADE1 = SHIFT48;
+	private static final Integer[] QUALIFIERS = join(DIGIT, SHIFT8, SHIFT16, SHIFT24, SHIFT32, SHIFT40, SHIFT48, SHIFT56);
 
 	// PINCODES
 	// SPECIAL
-	public static final Integer ENTER = 128;
-	public static final Integer[] SHIFT8_32 = join(SHIFT8, SHIFT32);
-	public static final Integer SPACE = -KeyEvent.VK_SPACE;
-	public static final Integer[] WHITESPACES = join(SPACE, ENTER);  // Ordered by most used.
-	public static final Integer GROUP_OPEN = 35; // same as N2
-	public static final Integer GROUP_CLOSE = 28;
+	private static final Integer ENTER = 128;
+	private static final Integer[] SHIFT8_32 = join(SHIFT8, SHIFT32);
+	private static final Integer SPACE = -KeyEvent.VK_SPACE;
+	private static final Integer[] WHITESPACES = join(SPACE, ENTER);  // Ordered by most used.
+	private static final Integer GROUP_OPEN = 35; // same as N2
+	private static final Integer GROUP_CLOSE = 28;
 
 	// LETTERS
-	public static final Integer Aa = 1;
-	public static final Integer Ab = 3;
-	public static final Integer Ac = 9;
-	public static final Integer Ad = 25;
-	public static final Integer Ae = 17;
-	public static final Integer Af = 11;
-	public static final Integer Ag = 27;
-	public static final Integer Ah = 19;
-	public static final Integer Ai = 10;
-	public static final Integer Aj = 26;
-	public static final Integer Ak = 5;
-	public static final Integer Al = 7;
-	public static final Integer Am = 13;
-	public static final Integer An = 29;
-	public static final Integer Ao = 21;
-	public static final Integer Ap = 15;
-	public static final Integer Aq = 31;
-	public static final Integer Ar = 23;
-	public static final Integer As = 14;
-	public static final Integer At = 30;
-	public static final Integer Au = 37;
-	public static final Integer Av = 39;
-	public static final Integer Aw = 58;
-	public static final Integer Ax = 45;
-	public static final Integer Ay = 61;
-	public static final Integer Az = 53;
-	public static final HashMap<Integer, KeyData[]> ALPHABET = new HashMap<Integer, KeyData[]>();
+	private static final Integer Aa = 1;
+	private static final Integer Ab = 3;
+	private static final Integer Ac = 9;
+	private static final Integer Ad = 25;
+	private static final Integer Ae = 17;
+	private static final Integer Af = 11;
+	private static final Integer Ag = 27;
+	private static final Integer Ah = 19;
+	private static final Integer Ai = 10;
+	private static final Integer Aj = 26;
+	private static final Integer Ak = 5;
+	private static final Integer Al = 7;
+	private static final Integer Am = 13;
+	private static final Integer An = 29;
+	private static final Integer Ao = 21;
+	private static final Integer Ap = 15;
+	private static final Integer Aq = 31;
+	private static final Integer Ar = 23;
+	private static final Integer As = 14;
+	private static final Integer At = 30;
+	private static final Integer Au = 37;
+	private static final Integer Av = 39;
+	private static final Integer Aw = 58;
+	private static final Integer Ax = 45;
+	private static final Integer Ay = 61;
+	private static final Integer Az = 53;
+	private static final HashMap<Integer, KeyData[]> ALPHABET = new HashMap<Integer, KeyData[]>();
 	static {
 		ALPHABET.put(Aa, new KeyData[] {KD_Aa, KD_AA});
 		ALPHABET.put(Ab, new KeyData[] {KD_Ab, KD_AB});
@@ -945,31 +936,31 @@ public class TextAreaBraille extends JTextArea {
 		ALPHABET.put(Ay, new KeyData[] {KD_Ay, KD_AY});
 		ALPHABET.put(Az, new KeyData[] {KD_Az, KD_AZ});
 	}
-	public static final int LOWER = 0;
-	public static final int UPPER = 1;
+	private static final int LOWER = 0;
+	private static final int UPPER = 1;
 
 	// NUMBERS
-	public static final Integer N0 = 63;
-	public static final Integer N1 = 33;
-	public static final Integer N2 = 35;
-	public static final Integer N3 = 41;
-	public static final Integer N4 = 57;
-	public static final Integer N5 = 49;
-	public static final Integer N6 = 43;
-	public static final Integer N7 = 59;
-	public static final Integer N8 = 51;
-	public static final Integer N9 = 42;
-	public static final Integer[] D1 = join(DIGIT, Aa);
-	public static final Integer[] D2 = join(DIGIT, Ab);
-	public static final Integer[] D3 = join(DIGIT, Ac);
-	public static final Integer[] D4 = join(DIGIT, Ad);
-	public static final Integer[] D5 = join(DIGIT, Ae);
-	public static final Integer[] D6 = join(DIGIT, Af);
-	public static final Integer[] D7 = join(DIGIT, Ag);
-	public static final Integer[] D8 = join(DIGIT, Ah);
-	public static final Integer[] D9 = join(DIGIT, Ai);
-	public static final Integer[] D0 = join(DIGIT, Aj);
-	public static final HashMap<Integer, KeyData> NUMBERS = new HashMap<Integer, KeyData>();
+	private static final Integer N0 = 63;
+	private static final Integer N1 = 33;
+	private static final Integer N2 = 35;
+	private static final Integer N3 = 41;
+	private static final Integer N4 = 57;
+	private static final Integer N5 = 49;
+	private static final Integer N6 = 43;
+	private static final Integer N7 = 59;
+	private static final Integer N8 = 51;
+	private static final Integer N9 = 42;
+	private static final Integer[] D1 = join(DIGIT, Aa);
+	private static final Integer[] D2 = join(DIGIT, Ab);
+	private static final Integer[] D3 = join(DIGIT, Ac);
+	private static final Integer[] D4 = join(DIGIT, Ad);
+	private static final Integer[] D5 = join(DIGIT, Ae);
+	private static final Integer[] D6 = join(DIGIT, Af);
+	private static final Integer[] D7 = join(DIGIT, Ag);
+	private static final Integer[] D8 = join(DIGIT, Ah);
+	private static final Integer[] D9 = join(DIGIT, Ai);
+	private static final Integer[] D0 = join(DIGIT, Aj);
+	private static final HashMap<Integer, KeyData> NUMBERS = new HashMap<Integer, KeyData>();
 	static {
 		NUMBERS.put(N0, KD_0);
 		NUMBERS.put(N1, KD_1);
@@ -984,96 +975,97 @@ public class TextAreaBraille extends JTextArea {
 	}
 
 	// MUSIC
-	public static final Integer[] NATURAL = join(DIGIT, N1); // No Arial char
-	public static final Integer[] FLAT = join(DIGIT, GROUP_OPEN); // No Arial char
-	public static final Integer[] SHARP = join(DIGIT, N3);
+	//private static final Integer[] NATURAL = join(DIGIT, N1); // No Arial char
+	//private static final Integer[] FLAT = join(DIGIT, GROUP_OPEN); // No Arial char
+	private static final Integer[] SHARP = join(DIGIT, N3);
 
 	// SIMPLE PUNCTUATION
-	public static final Integer APOSTROPHE = 4;
-	public static final Integer COLON = 18;
-	public static final Integer COMMA = 2;
-	public static final Integer EXCLAMATION = 22;
-	public static final Integer FULLSTOP = 50;
-	public static final Integer HYPHEN = 36;
-	public static final Integer PRIME = 54;
-	public static final Integer QUESTION = 38;
-	public static final Integer SEMICOLON = 6;
+	private static final Integer APOSTROPHE = 4;
+	private static final Integer COLON = 18;
+	private static final Integer COMMA = 2;
+	private static final Integer EXCLAMATION = 22;
+	private static final Integer FULLSTOP = 50;
+	private static final Integer HYPHEN = 36;
+	private static final Integer PRIME = 54;
+	private static final Integer QUESTION = 38;
+	private static final Integer SEMICOLON = 6;
 
 	// COMPLEX PUNCTUATION
-	public static final Integer[] DOUBLE_PRIME = join(PRIME, PRIME);
+	private static final Integer[] DOUBLE_PRIME = join(PRIME, PRIME);
 
 	// GROUP PUNCTUATION
-	public static final Integer[] ANGLE_BRACKET_OPEN = join(SHIFT8, GROUP_OPEN);
-	public static final Integer[] ANGLE_BRACKET_CLOSE = join(SHIFT8, GROUP_CLOSE);
-	public static final Integer[] CURLY_BRACKET_OPEN = join(SHIFT56, GROUP_OPEN);
-	public static final Integer[] CURLY_BRACKET_CLOSE = join(SHIFT56, GROUP_CLOSE);
-	public static final Integer[] ROUND_BRACKET_OPEN = join(SHIFT16, GROUP_OPEN);
-	public static final Integer[] ROUND_BRACKET_CLOSE = join(SHIFT16, GROUP_CLOSE);
-	public static final Integer[] SQUARE_BRACKET_OPEN = join(SHIFT40, GROUP_OPEN);
-	public static final Integer[] SQUARE_BRACKET_CLOSE = join(SHIFT40, GROUP_CLOSE);
+	private static final Integer[] ANGLE_BRACKET_OPEN = join(SHIFT8, GROUP_OPEN);
+	private static final Integer[] ANGLE_BRACKET_CLOSE = join(SHIFT8, GROUP_CLOSE);
+	private static final Integer[] CURLY_BRACKET_OPEN = join(SHIFT56, GROUP_OPEN);
+	private static final Integer[] CURLY_BRACKET_CLOSE = join(SHIFT56, GROUP_CLOSE);
+	private static final Integer[] ROUND_BRACKET_OPEN = join(SHIFT16, GROUP_OPEN);
+	private static final Integer[] ROUND_BRACKET_CLOSE = join(SHIFT16, GROUP_CLOSE);
+	private static final Integer[] SQUARE_BRACKET_OPEN = join(SHIFT40, GROUP_OPEN);
+	private static final Integer[] SQUARE_BRACKET_CLOSE = join(SHIFT40, GROUP_CLOSE);
 
 	// SHIFT 8 / CURRENCY
-	public static final Integer[] AMPERSAND = join(SHIFT8, 47);
-	public static final Integer[] AT_SIGN = join(SHIFT8, Aa);
-	public static final Integer[] CARET = join(SHIFT8, 34);
-	public static final Integer[] CENT = join(SHIFT8, Ac);
-	public static final Integer[] DOLLAR = join(SHIFT8, As);
-	public static final Integer[] EURO = join(SHIFT8, Ae);
-	public static final Integer[] FRANC = join(SHIFT8, Af);
-	public static final Integer[] GBP = join(SHIFT8, Al);
-	public static final Integer[] GRREATER_THAN = ANGLE_BRACKET_CLOSE;
-	public static final Integer[] LESS_THAN = ANGLE_BRACKET_OPEN;
-	public static final Integer[] NAIRA = join(SHIFT8, An);
-	public static final Integer[] TILDE = join(SHIFT8, 20);
-	public static final Integer[] YEN = join(SHIFT8, Ay);
+	private static final Integer[] AMPERSAND = join(SHIFT8, 47);
+	private static final Integer[] AT_SIGN = join(SHIFT8, Aa);
+	private static final Integer[] CARET = join(SHIFT8, 34);
+	private static final Integer[] CENT = join(SHIFT8, Ac);
+	private static final Integer[] DOLLAR = join(SHIFT8, As);
+	private static final Integer[] EURO = join(SHIFT8, Ae);
+	private static final Integer[] FRANC = join(SHIFT8, Af);
+	private static final Integer[] GBP = join(SHIFT8, Al);
+	//private static final Integer[] GRREATER_THAN = ANGLE_BRACKET_CLOSE;
+	//private static final Integer[] LESS_THAN = ANGLE_BRACKET_OPEN;
+	private static final Integer[] NAIRA = join(SHIFT8, An);
+	private static final Integer[] TILDE = join(SHIFT8, 20);
+	private static final Integer[] YEN = join(SHIFT8, Ay);
 	// SHIFT 8 - COMBINING CHARACTERS
-	public static final Integer[] BREVE = join(SHIFT8, 44);
-	public static final Integer[] MACRON = join(SHIFT8, HYPHEN);
-	public static final Integer[] SOLIDUS = join(SHIFT8, N1);
-	public static final Integer[] STRIKETHROUGH = join(SHIFT8, COLON);
+	private static final Integer[] BREVE = join(SHIFT8, 44);
+	private static final Integer[] MACRON = join(SHIFT8, HYPHEN);
+	private static final Integer[] SOLIDUS = join(SHIFT8, N1);
+	private static final Integer[] STRIKETHROUGH = join(SHIFT8, COLON);
 	// SHIFT 8 -> SHIFT 32
-	public static final Integer[] DAGGER = join(SHIFT8_32, N4);
-	public static final Integer[] DOUBLE_DAGGER = join(SHIFT8_32, N7);
+	private static final Integer[] DAGGER = join(SHIFT8_32, N4);
+	private static final Integer[] DOUBLE_DAGGER = join(SHIFT8_32, N7);
 
 	// SHIFT 16 / MATHS
-	public static final Integer[] ASTERISK = join(SHIFT16, 20);
-	public static final Integer[] DITTO = join(SHIFT16, 2);
-	public static final Integer[] DIVIDE = join(SHIFT16, 12);
-	public static final Integer[] EQUALS = join(SHIFT16, PRIME);
-	public static final Integer[] MINUS = join(SHIFT16, HYPHEN);
-	public static final Integer[] MULTIPLY = join(SHIFT16, QUESTION);
-	public static final Integer[] PLUS = join(SHIFT16, EXCLAMATION);
+	private static final Integer[] ASTERISK = join(SHIFT16, 20);
+	private static final Integer[] DITTO = join(SHIFT16, 2);
+	private static final Integer[] DIVIDE = join(SHIFT16, 12);
+	private static final Integer[] EQUALS = join(SHIFT16, PRIME);
+	private static final Integer[] MINUS = join(SHIFT16, HYPHEN);
+	private static final Integer[] MULTIPLY = join(SHIFT16, QUESTION);
+	private static final Integer[] PLUS = join(SHIFT16, EXCLAMATION);
 
 	// SHIFT 24
-	public static final Integer[] COPYRIGHT = join(SHIFT24, Ac);
-	public static final Integer[] DEGREES = join(SHIFT24, Aj);
-	public static final Integer[] PARAGRAPH = join(SHIFT24, Ap);
-	public static final Integer[] REGISTERED = join(SHIFT24, Ar);
-	public static final Integer[] SECTION = join(SHIFT24, As);
-	public static final Integer[] TRADEMARK = join(SHIFT24, At);
-	public static final Integer[] FEMALE = join(SHIFT24, Ax);
-	public static final Integer[] MALE = join(SHIFT24, Ay);
+	private static final Integer[] COPYRIGHT = join(SHIFT24, Ac);
+	private static final Integer[] DEGREES = join(SHIFT24, Aj);
+	private static final Integer[] PARAGRAPH = join(SHIFT24, Ap);
+	private static final Integer[] REGISTERED = join(SHIFT24, Ar);
+	private static final Integer[] SECTION = join(SHIFT24, As);
+	private static final Integer[] TRADEMARK = join(SHIFT24, At);
+	private static final Integer[] FEMALE = join(SHIFT24, Ax);
+	private static final Integer[] MALE = join(SHIFT24, Ay);
 	// SHIFT 24 - COMBINING CHARACTERS
-	public static final Integer[] ACUTE = join(SHIFT24, 12);
-	public static final Integer[] CARON = join(SHIFT24, 44);
-	public static final Integer[] CEDILLA = join(SHIFT24, 47);
-	public static final Integer[] CIRCUMFLEX = join(SHIFT24, N3);
-	public static final Integer[] DIAERESIS = join(SHIFT24, COLON);
-	public static final Integer[] GRAVE = join(SHIFT24, N1);
-	public static final Integer[] RING = join(SHIFT24, N6);
-	public static final Integer[] TILDE_COMB = join(SHIFT24, N7);
+	private static final Integer[] ACUTE = join(SHIFT24, 12);
+	private static final Integer[] CARON = join(SHIFT24, 44);
+	private static final Integer[] CEDILLA = join(SHIFT24, 47);
+	private static final Integer[] CIRCUMFLEX = join(SHIFT24, N3);
+	private static final Integer[] DIAERESIS = join(SHIFT24, COLON);
+	private static final Integer[] GRAVE = join(SHIFT24, N1);
+	private static final Integer[] RING = join(SHIFT24, N6);
+	private static final Integer[] TILDE_COMB = join(SHIFT24, N7);
+	private static final Integer[] LIGATURE = join(SHIFT24, EXCLAMATION);
 
 	// SHIFT 40
-	public static final Integer[] PERCENT = join(SHIFT40, 52);
-	public static final Integer[] UNDERSCORE = join(SHIFT40, HYPHEN);
+	private static final Integer[] PERCENT = join(SHIFT40, 52);
+	private static final Integer[] UNDERSCORE = join(SHIFT40, HYPHEN);
 
 	// SHIFT 56
-	public static final Integer[] BACK_SLASH = join(SHIFT56, N1);
-	public static final Integer[] BULLET = join(SHIFT56, FULLSTOP);
-	public static final Integer[] FORWARD_SLASH = join(SHIFT56, 12);
-	public static final Integer[] NUMBER = join(SHIFT56, N4);
+	private static final Integer[] BACK_SLASH = join(SHIFT56, N1);
+	private static final Integer[] BULLET = join(SHIFT56, FULLSTOP);
+	private static final Integer[] FORWARD_SLASH = join(SHIFT56, 12);
+	private static final Integer[] NUMBER = join(SHIFT56, N4);
 
-	public static final HashMap<Integer[], KeyData[]> MODIFIERS = new HashMap<Integer[], KeyData[]>();
+	private static final HashMap<Integer[], KeyData[]> MODIFIERS = new HashMap<Integer[], KeyData[]>();
 	static {
 		MODIFIERS.put(ACUTE, join(KD_ACUTE));
 		MODIFIERS.put(BREVE, join(KD_BREVE));
@@ -1114,7 +1106,7 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer[] Gchi = join(SHIFT40, 47);
 	private static final Integer[] Gpsi = join(SHIFT40, Ay);
 	private static final Integer[] Gomega = join(SHIFT40, Aw);
-	public static final HashMap<Integer[], KeyData[]> GREEK = new HashMap<Integer[], KeyData[]>();
+	private static final HashMap<Integer[], KeyData[]> GREEK = new HashMap<Integer[], KeyData[]>();
 	static {
 		GREEK.put(Galpha, new KeyData[] {KD_Galpha, KD_GALPHA});
 		GREEK.put(Gbeta, new KeyData[] {KD_Gbeta, KD_GBETA});
@@ -1140,5 +1132,10 @@ public class TextAreaBraille extends JTextArea {
 		GREEK.put(Gchi, new KeyData[] {KD_Gchi, KD_GCHI});
 		GREEK.put(Gpsi, new KeyData[] {KD_Gpsi, KD_GPSI});
 		GREEK.put(Gomega, new KeyData[] {KD_Gomega, KD_GOMEGA});
+	}
+
+	private static final HashMap<Integer, MapData> BRAILLE_MAP = new HashMap<Integer, MapData>();
+	static {
+		populateBrailleMap();
 	}
 }
