@@ -4,6 +4,7 @@ import java.awt.Component;
 import java.awt.event.KeyEvent;
 import java.text.Normalizer;
 import java.text.Normalizer.Form;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -109,7 +110,7 @@ public class TextAreaBraille extends JTextArea {
     private int currentPinCode = 0;
 	private ArrayList<Integer> currentPinCodesList = new ArrayList<Integer>();
     private boolean lastKeyDown = false;
-	private KeyData lastKeyDataSent = null;
+	private ArrayDeque<MapData> recentMapData = new ArrayDeque<MapData>(2);
 	private int wordLength = 0;
 	private int shift = 0; // 0 = no shift, 1 = normal, 2 = word, 3 = Caps Lock
 	private int shift40 = 0;
@@ -118,7 +119,8 @@ public class TextAreaBraille extends JTextArea {
     TextAreaBraille() {
         super();
 		// Initialise as if we've just had whitespace, arbitrarily ENTER.
-		lastKeyDataSent = KD_ENTER;
+		recentMapData.add(BRAILLE_MAP.get(ENTER));
+		recentMapData.add(BRAILLE_MAP.get(ENTER));
     }
 
 
@@ -170,6 +172,7 @@ public class TextAreaBraille extends JTextArea {
 
 			case KeyEvent.VK_BACK_SPACE:
 				sendKeyEvents(e.getComponent(), e. getWhen(), BRAILLE_MAP.get(-keyCode).keyData);
+				updateRecentMapData(BRAILLE_MAP.get(-keyCode));
 				if (shift < 3) shift = 0;
 				if (shift40 < 3) shift40 = 0;
 				if (digit < 3) digit = 0;
@@ -270,6 +273,7 @@ public class TextAreaBraille extends JTextArea {
 					// of wordLength.
 					wordLength += md.keyData.size();
 				}
+				updateRecentMapData(md);
 			}
 			// We may possibly be doing a prime, double prime situation.
 //			if (md.isOverflow()) {
@@ -302,6 +306,7 @@ public class TextAreaBraille extends JTextArea {
 				if (shift < 3) shift = 0;
 				if (shift40 < 3) shift40 = 0;
 				if (digit < 3) digit = 0;
+				wordLength = 0;
 			}
 
 			//if (pinCodeOverflow == 0) {
@@ -325,6 +330,10 @@ public class TextAreaBraille extends JTextArea {
 		lastKeyDown = false;
 	}
 
+	private void updateRecentMapData(MapData md) {
+		recentMapData.removeFirst();
+		recentMapData.addLast(md);
+	}
 
 	// Called with whitespace to remove preceding shifts and digits.
 	private void popModifiers() {
@@ -413,7 +422,7 @@ public class TextAreaBraille extends JTextArea {
 						if (mdModified == null) {
 							return new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.CHARACTER);
 						} else {
-							// On rare combinations there is only a nomralised char for one case.
+							// On rare combinations there is only a normalized char for one case.
 							if (mdModified.keyData.get(aCase).keyCode == 0) {
 								return new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.CHARACTER); 
 							} else {
@@ -464,7 +473,6 @@ public class TextAreaBraille extends JTextArea {
 							keyData.keyCode,
 							keyData.keyChar);
 		super.processKeyEvent(newE);
-		lastKeyDataSent = keyData;
 	}
 
 
@@ -680,7 +688,7 @@ public class TextAreaBraille extends JTextArea {
 		// ASCII CHARACTERS. Stored under the negative of their keycode.
         addWhitespaceToBrailleMap(Integer.valueOf(-KeyEvent.VK_ENTER), KD_ENTER);
         //addWhitespaceToBrailleMap(Integer.valueOf(-KeyEvent.VK_SPACE), KD_SPACE);
-    	addCharToBrailleMap(Integer.valueOf(-KeyEvent.VK_BACK_SPACE), KD_BACKSPACE);
+    	addCharToBrailleMap(BACKSPACE, KD_BACKSPACE);
 	}
 
 	private static final HashMap<Integer, Integer> KEY_PIN_MAP = new HashMap<Integer, Integer>();
@@ -696,8 +704,9 @@ public class TextAreaBraille extends JTextArea {
         KEY_PIN_MAP.put(59, 128); // ;
     }
 
-	private static final int WHITESPACE = 0;
-	private static final int WILDCARD = 63; // Same as N0
+	private static final Integer BACKSPACE = -KeyEvent.VK_BACK_SPACE;
+	private static final Integer WHITESPACE = 0;
+	private static final Integer WILDCARD = 63; // Same as N0
 
 	// SOME COMMON KEYDATA
 	private static final KeyData KD_BACKSPACE = new KeyData('\b', KeyEvent.VK_BACK_SPACE);
