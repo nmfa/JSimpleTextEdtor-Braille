@@ -105,10 +105,12 @@ class KeyData {
 
 // Need the KeyData pointer as MapData alone doesn't tell us which case was used.
 class History {
+	ArrayList<Integer> pinCodeList;
 	MapData mapData;
 	ArrayList<KeyData> keyData;
 
-	History(MapData md, ArrayList<KeyData> kd) {
+	History(ArrayList<Integer> pcl, MapData md, ArrayList<KeyData> kd) {
+		this.pinCodeList = new ArrayList<Integer>(pcl);
 		this.mapData = md;
 		this.keyData = kd;
 	}
@@ -145,8 +147,8 @@ public class TextAreaBraille extends JTextArea {
     TextAreaBraille() {
         super();
 		// Initialise as if we've just had whitespace, arbitrarily ENTER.
-		recentHistory.add(new History(BRAILLE_MAP.get(ENTER), BRAILLE_MAP.get(ENTER).keyData));
-		recentHistory.add(new History(BRAILLE_MAP.get(ENTER), BRAILLE_MAP.get(ENTER).keyData));
+		recentHistory.add(new History(new ArrayList<Integer>(Arrays.asList(ENTER)), BRAILLE_MAP.get(ENTER), BRAILLE_MAP.get(ENTER).keyData));
+		recentHistory.add(new History(new ArrayList<Integer>(Arrays.asList(ENTER)), BRAILLE_MAP.get(ENTER), BRAILLE_MAP.get(ENTER).keyData));
     }
 
 
@@ -346,7 +348,7 @@ public class TextAreaBraille extends JTextArea {
 
 	private void updateRecentHistory(MapData md, ArrayList<KeyData> kd) {
 		recentHistory.removeFirst();
-		recentHistory.addLast(new History(md, kd));
+		recentHistory.addLast(new History(currentPinCodesList, md, kd));
 	}
 
 	private void popQualifiers() {
@@ -419,23 +421,35 @@ public class TextAreaBraille extends JTextArea {
 					}
 				}
 				if (md.isAlphabet()) {
+					MapData result = md;
 					// Apply any modifier
 					if (mdModifier != null) {
 						MapData mdModified =
 							getModifiedAlphabet(mdModifier, currentPinCodesList.get(pinCodeCount-1));
 						if (mdModified == null) {
-							return new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.CHARACTER | MapData.MODIFIER);
+							result = new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.CHARACTER | MapData.MODIFIER);
 						} else {
 							// On rare combinations there is only a normalized char for one case.
 							if (mdModified.keyData.get(aCase).keyCode == 0) {
-								return new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.CHARACTER | MapData.MODIFIER); 
+								result = new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.CHARACTER | MapData.MODIFIER); 
 							} else {
-								return mdModified;
+								result = mdModified;
 							}
 						}
-					} else {
-						return md;
 					}
+					if (mdLigature != null) {
+						// Is the precidimg character an alphabet?
+						History lastHistory = recentHistory.getLast();
+						if (lastHistory.mapData.isAlphabet()) {
+							// Is there a single character for this ligature?
+							Integer lastAlphabetPinCode =
+								lastHistory.pinCodeList.get(lastHistory.pinCodeList.size() - 1);
+							if (BRAILLE_MAP.get(lastAlphabetPinCode).hasLigature()) {
+
+							}
+						}
+					}
+					return result;
 				} else { // WHITESPACE, CHARACTER, STRING, none of which can't be modified.
 					return md;
 				}
