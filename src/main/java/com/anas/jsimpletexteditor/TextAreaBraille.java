@@ -64,7 +64,8 @@ class MapData {
 	public boolean isConcrete() {return (type & CONCRETE) > 0;}
 	public boolean isFinal() {return (type & FINAL) > 0;}
 	public boolean isModifier() {return (type & MODIFIER) > 0;}
-	public boolean isLigature() {return (type & LIGATURE) > 0;}
+	public boolean isLigature() {return (type & LIGATURE) > 0 && (type & ~LIGATURE) == 0;}
+	public boolean hasLigature() {return (type & (ALPHABET | LIGATURE)) > 0;}
 	public boolean isAlphabet() {return (type & ALPHABET) > 0;}
 	public boolean isOverflow() {return (type & OVERFLOWS) > 0;}
 	public boolean isWhitespace() {return (type & WHITESPACE) > 0;}
@@ -102,6 +103,16 @@ class KeyData {
 }
 
 
+// Need the KeyData pointer as MapData alone doesn't tell us which case was used.
+class History {
+	MapData mapData;
+	ArrayList<KeyData> keyData;
+
+	History(MapData md, ArrayList<KeyData> kd) {
+		this.mapData = md;
+		this.keyData = kd;
+	}
+}
 
 
 public class TextAreaBraille extends JTextArea {
@@ -124,7 +135,7 @@ public class TextAreaBraille extends JTextArea {
     private int currentPinCode = 0;
 	private ArrayList<Integer> currentPinCodesList = new ArrayList<Integer>();
     private boolean lastKeyDown = false;
-	private ArrayDeque<MapData> recentMapData = new ArrayDeque<MapData>(2);
+	private ArrayDeque<History> recentHistory = new ArrayDeque<History>(2);
 	private int wordLength = 0;
 	private LOCK grade1 = LOCK.OFF;
 	private LOCK shift = LOCK.OFF;
@@ -134,8 +145,8 @@ public class TextAreaBraille extends JTextArea {
     TextAreaBraille() {
         super();
 		// Initialise as if we've just had whitespace, arbitrarily ENTER.
-		recentMapData.add(BRAILLE_MAP.get(ENTER));
-		recentMapData.add(BRAILLE_MAP.get(ENTER));
+		recentHistory.add(new History(BRAILLE_MAP.get(ENTER), BRAILLE_MAP.get(ENTER).keyData));
+		recentHistory.add(new History(BRAILLE_MAP.get(ENTER), BRAILLE_MAP.get(ENTER).keyData));
     }
 
 
@@ -187,7 +198,7 @@ public class TextAreaBraille extends JTextArea {
 
 			case KeyEvent.VK_BACK_SPACE:
 				sendKeyEvents(e.getComponent(), e. getWhen(), BRAILLE_MAP.get(-keyCode).keyData);
-				updateRecentMapData(BRAILLE_MAP.get(-keyCode));
+				updateRecentHistory(BRAILLE_MAP.get(-keyCode), BRAILLE_MAP.get(-keyCode).keyData);
 				wordResets();
 				currentPinCodesList.clear();
 				qualifyPinCode();
@@ -265,6 +276,7 @@ public class TextAreaBraille extends JTextArea {
 				if (md.isAlphabet()) {
 					int aCase = (shift.isOn()) ? UPPER : LOWER;
 					sendKeyEvents(e.getComponent(), e.getWhen(), md.keyData.get(aCase));
+					updateRecentHistory(md, md.keyData.get(aCase));
 					wordLength++;
 				} else if (md.isFinal()) {
 					sendKeyEvents(e.getComponent(), e.getWhen(), md.keyData);
@@ -272,8 +284,8 @@ public class TextAreaBraille extends JTextArea {
 					// but they can't be part of contractions, and that is the purpose
 					// of wordLength.
 					wordLength += md.keyData.size();
+					updateRecentHistory(md, md.keyData);
 				}
-				updateRecentMapData(md);
 			}
 			//if (pinCodeOverflow == 0) {
 			if (!md.isOverflow()) {
@@ -321,16 +333,22 @@ public class TextAreaBraille extends JTextArea {
 	}
 
 	private void qualifyPinCode() {
+		// GRADE1 and SHIFT are operating just off the class variable.
+		// SHIFT40 and DIGIT are used as part of the mappings currently,
+		// so for ease need to be part of the pin code array.
 		if (shift40.isOn()) currentPinCodesList.add(SHIFT40);
 		if (digit.isOn()) currentPinCodesList.add(DIGIT);
 	}
 
-	private void updateRecentMapData(MapData md) {
-		recentMapData.removeFirst();
-		recentMapData.addLast(md);
+	private void updateRecentHistory(MapData md, KeyData... kd) {
+		updateRecentHistory(md, new ArrayList<KeyData>(Arrays.asList(kd)));
 	}
 
-	// Called with whitespace to remove preceding shifts and digits.
+	private void updateRecentHistory(MapData md, ArrayList<KeyData> kd) {
+		recentHistory.removeFirst();
+		recentHistory.addLast(new History(md, kd));
+	}
+
 	private void popQualifiers() {
 		if (currentPinCodesList.size() == 0) return;
 		int finalIndex = currentPinCodesList.size() - 1;
@@ -380,13 +398,6 @@ public class TextAreaBraille extends JTextArea {
 		MapData mdModifier = null;
 		MapData mdLigature = null;
 
-		// SHIFT always first code
-//		if (currentPinCodesList.get(pcIndex[0]) == SHIFT) {
-//			if (pinCodeCount == 1) return new MapData();
-//			aCase = UPPER;
-//			pcIndex[0]++;
-//		}
-
 		MapData md = null;
 		while (pcIndex[0] < pinCodeCount) {
 			md = __getMapDataFromBrailleMap(pcIndex);
@@ -425,7 +436,7 @@ public class TextAreaBraille extends JTextArea {
 					} else {
 						return md;
 					}
-				} else { // WHITESPACE, CHARACTER, STRING, none of which can be modified.
+				} else { // WHITESPACE, CHARACTER, STRING, none of which can't be modified.
 					return md;
 				}
 			}
@@ -499,12 +510,12 @@ public class TextAreaBraille extends JTextArea {
 				if (keyChar != aKeyData[UPPER].keyChar) {
 					pair[UPPER] = new KeyData(keyChar);
 					if (!modifiedPair) {
-						pair[LOWER] = new KeyData(' ', 0);
+						pair[LOWER] = KD_NULL;
 						log.warning("UPPER MODIFIED CHARACTER, BUT NO LOWER: " + aKeyData[LOWER].keyChar + String.format("\\u%04x", (int) mKeyData[0].keyChar));
 					}
 					modifiedPair = true;
 				} else if (modifiedPair) {
-					pair[UPPER] = new KeyData(' ', 0);
+					pair[UPPER] = KD_NULL;
 					log.warning("LOWER MODIFIED CHARACTER, BUT NO UPPER: " + aKeyData[UPPER].keyChar + String.format("\\u%04x", (int) mKeyData[0].keyChar));
 				}
 				if (modifiedPair) {
@@ -534,6 +545,10 @@ public class TextAreaBraille extends JTextArea {
 	private static void addWhitespaceToBrailleMap(Integer pinCode, KeyData... keyData) {
 		Integer[] pinCodes = {pinCode};
 		addToBrailleMap(pinCodes, MapData.WHITESPACE | MapData.STANDALONE, keyData);
+	}
+
+	private static void addLigatureToBrailleMap() {
+
 	}
 
 	private static void addToBrailleMap(Integer[] pinCodes, int type, KeyData... keyData) {
@@ -699,9 +714,9 @@ public class TextAreaBraille extends JTextArea {
 
 	private static final Integer BACKSPACE = -KeyEvent.VK_BACK_SPACE;
 	private static final Integer WHITESPACE = 0;
-	private static final Integer WILDCARD = 63; // Same as N0
 
 	// SOME COMMON KEYDATA
+	private static final KeyData KD_NULL = new KeyData(' ', 0);
 	private static final KeyData KD_BACKSPACE = new KeyData('\b', KeyEvent.VK_BACK_SPACE);
 	private static final KeyData KD_ENTER = new KeyData('\n', KeyEvent.VK_ENTER);
 	private static final KeyData KD_SPACE = new KeyData(' ', KeyEvent.VK_SPACE);
@@ -940,6 +955,23 @@ public class TextAreaBraille extends JTextArea {
 	}
 	private static final int LOWER = 0;
 	private static final int UPPER = 1;
+
+	// LIGATURES
+	private static final HashMap<Integer[], KeyData[]> LIGATURES = new HashMap<Integer[], KeyData[]>();
+	static {
+		LIGATURES.put(join(Aa, Ae), join(KD_Lae, KD_LAE));
+		LIGATURES.put(join(Af, Af), join(KD_Lff, KD_NULL));
+		LIGATURES.put(join(Af, Af, Ai), join(KD_Lffi, KD_NULL));
+		LIGATURES.put(join(Af, Af, Al), join(KD_Lffl, KD_NULL));
+		LIGATURES.put(join(Af, Ai), join(KD_Lfi, KD_NULL));
+		LIGATURES.put(join(Af, Al), join(KD_Lfl, KD_NULL));
+		LIGATURES.put(join(Af, At), join(KD_Lft, KD_NULL));
+		LIGATURES.put(join(Ai, Aj), join(KD_Lij, KD_LIJ));
+		LIGATURES.put(join(Ao, Ae), join(KD_Loe, KD_LOE));
+		LIGATURES.put(join(At, Ah), join(KD_Lth, KD_LTH));
+		LIGATURES.put(join(As, At), join(KD_Lst, KD_NULL));
+		LIGATURES.put(join(Au, Ae), join(KD_Lue, KD_NULL));
+	}
 
 	// NUMBERS
 	private static final Integer N0 = 63;
