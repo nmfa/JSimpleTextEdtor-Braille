@@ -547,8 +547,13 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(pinCodes, MapData.WHITESPACE | MapData.STANDALONE, keyData);
 	}
 
-	private static void addLigatureToBrailleMap() {
-
+	private static void addLigaturesToBrailleMap() {
+		for (Integer[] ligature: LIGATURES.keySet()) {
+			addToBrailleMap(ligature, MapData.ALPHABET, LIGATURES.get(ligature));
+			// Specificakky disable OVERFLOWS for the left alphabet character.
+			int leftLetterType = BRAILLE_MAP.get(ligature[LEFT]).type;
+			leftLetterType = leftLetterType | ~MapData.OVERFLOWS;
+		}
 	}
 
 	private static void addToBrailleMap(Integer[] pinCodes, int type, KeyData... keyData) {
@@ -604,6 +609,7 @@ public class TextAreaBraille extends JTextArea {
 		addAlphabetsToBrailleMap();
 		addCombiningCharsToBrailleMap();
 		addToBrailleMap(LIGATURE, MapData.LIGATURE | MapData.OVERFLOWS, KD_LIGATURE);
+		addLigaturesToBrailleMap();
 
 		addWhitespaceToBrailleMap(ENTER, KD_ENTER);
 		addWhitespaceToBrailleMap(SPACE, KD_SPACE);
@@ -955,6 +961,8 @@ public class TextAreaBraille extends JTextArea {
 	}
 	private static final int LOWER = 0;
 	private static final int UPPER = 1;
+	private static final int LEFT = 0;
+	private static final int RIGHT = 1;
 
 	// LIGATURES
 	private static final HashMap<Integer[], KeyData[]> LIGATURES = new HashMap<Integer[], KeyData[]>();
