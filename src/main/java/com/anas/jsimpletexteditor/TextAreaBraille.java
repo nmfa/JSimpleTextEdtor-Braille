@@ -64,9 +64,10 @@ class MapData {
 	public boolean isConcrete() {return (type & CONCRETE) > 0;}
 	public boolean isFinal() {return (type & FINAL) > 0;}
 	public boolean isModifier() {return (type & MODIFIER) > 0;}
-	public boolean isLigature() {return (type & LIGATURE) > 0 && (type & ~LIGATURE) == 0;}
+	public boolean isLigature() {return (type & LIGATURE) > 0 && (type & ~(LIGATURE | OVERFLOWS)) == 0;}
 	public boolean hasLigature() {return (type & (ALPHABET | LIGATURE)) > 0;}
 	public boolean isAlphabet() {return (type & ALPHABET) > 0;}
+	public boolean isCharacter() {return (type & CHARACTER) > 0;}
 	public boolean isOverflow() {return (type & OVERFLOWS) > 0;}
 	public boolean isWhitespace() {return (type & WHITESPACE) > 0;}
 	public boolean isStandAloneMarker() {return (type & STANDALONE) > 0;}
@@ -128,7 +129,7 @@ public class TextAreaBraille extends JTextArea {
 			};
 		};
 		public LOCK next() {return values()[ordinal() + 1];}
-		public LOCK charReset()  {return (ordinal() < 3) ? OFF : values()[ordinal()];}
+		public LOCK charReset()  {return (ordinal() < 2) ? OFF : values()[ordinal()];}
 		public LOCK wordReset() {return (ordinal() < 3) ? OFF : FULL;}
 		public LOCK reset() {return OFF;}
 		public boolean isOn() {return ordinal() > 0;}
@@ -161,8 +162,8 @@ public class TextAreaBraille extends JTextArea {
         } else if (e.getID() == KeyEvent.KEY_RELEASED) {
 			log.info("PROCESSING EVENT: " + currentPinCode + ", " + currentPinCodesList.toString() + ", " + KEY_PIN_MAP.getOrDefault(e.getKeyCode(), 0));
 			onKeyUp(e);
-			log.info("PROCESSED: " + currentPinCode + ", " + currentPinCodesList.toString());
-        } else {
+			log.info("PROCESSED: " + currentPinCode + ", " + currentPinCodesList.toString() + ", " + shift);
+		} else {
             // Ignore
         }
     }
@@ -275,7 +276,7 @@ public class TextAreaBraille extends JTextArea {
 			}
 			if (md.keyData != null) {
 				// Send character sequence.
-				if (md.isAlphabet()) {
+				if (md.isAlphabet() && !md.isCharacter()) {
 					int aCase = (shift.isOn()) ? UPPER : LOWER;
 					sendKeyEvents(e.getComponent(), e.getWhen(), md.keyData.get(aCase));
 					updateRecentHistory(md, md.keyData.get(aCase));
@@ -293,7 +294,6 @@ public class TextAreaBraille extends JTextArea {
 			if (!md.isOverflow()) {
 				// Reset the pin code sequence, as one way or another it is done with.
 				currentPinCodesList.clear();
-				//pinCodeOverflow = 0;
 			}
 
 			// Deal with word locks of shift and digit
@@ -425,27 +425,42 @@ public class TextAreaBraille extends JTextArea {
 					// Apply any modifier
 					if (mdModifier != null) {
 						MapData mdModified =
-							getModifiedAlphabet(mdModifier, currentPinCodesList.get(pinCodeCount-1));
+							getModifiedAlphabet(mdModifier, currentPinCode);
 						if (mdModified == null) {
-							result = new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.CHARACTER | MapData.MODIFIER);
+							result = new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.ALPHABET | MapData.CHARACTER);
 						} else {
 							// On rare combinations there is only a normalized char for one case.
 							if (mdModified.keyData.get(aCase).keyCode == 0) {
-								result = new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.CHARACTER | MapData.MODIFIER); 
+								result = new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.ALPHABET | MapData.CHARACTER); 
 							} else {
 								result = mdModified;
 							}
 						}
 					}
-					if (mdLigature != null) {
+					if (mdLigature != null && md.isAlphabet()) {
 						// Is the precidimg character an alphabet?
 						History lastHistory = recentHistory.getLast();
 						if (lastHistory.mapData.isAlphabet()) {
 							// Is there a single character for this ligature?
 							Integer lastAlphabetPinCode =
 								lastHistory.pinCodeList.get(lastHistory.pinCodeList.size() - 1);
-							if (BRAILLE_MAP.get(lastAlphabetPinCode).hasLigature()) {
-
+							MapData leftMapData = BRAILLE_MAP.get(lastAlphabetPinCode);	
+							MapData rightMapData = null;
+							if (leftMapData.hasLigature()) {
+								rightMapData = leftMapData.map.get(currentPinCode);
+							}
+							if (rightMapData != null && rightMapData.keyData.get(aCase) != KD_NULL) {
+								result = new MapData(join(KD_BACKSPACE, rightMapData.keyData.get(aCase)), MapData.ALPHABET | MapData.CHARACTER);
+							} else {
+								ArrayList<KeyData> lkd = new ArrayList<KeyData>();
+								lkd.add(KD_LIGATURE[LEFT]);
+								if (md.isAlphabet()) {
+									lkd.add(md.keyData.get(aCase));
+								} else {
+									lkd.addAll(md.keyData);
+								}
+								lkd.add(KD_LIGATURE[RIGHT]);
+								result = new MapData(lkd, MapData.ALPHABET | MapData.CHARACTER);
 							}
 						}
 					}
@@ -455,7 +470,7 @@ public class TextAreaBraille extends JTextArea {
 				}
 			}
 			if (md.isModifier()) mdModifier = md;
-			if (md.isLigature()) mdLigature = md;
+			if (md.isLigature()) {mdLigature = md;}
 		}
 
 		return md;
@@ -610,9 +625,9 @@ public class TextAreaBraille extends JTextArea {
 	private static <T> T[] join(T... items) {
 		return Arrays.copyOf(items, items.length);
 	}
-
-	private static Integer[] join(Integer[] arr, Integer... items) {
-		Integer[] newArr = Arrays.copyOf(arr, arr.length + items.length);
+	@SafeVarargs
+	private static <T> T[] join(T[] arr, T... items) {
+		T[] newArr = Arrays.copyOf(arr, arr.length + items.length);
 		System.arraycopy(items, 0, newArr, arr.length, items.length);
 		return newArr;
 	}
