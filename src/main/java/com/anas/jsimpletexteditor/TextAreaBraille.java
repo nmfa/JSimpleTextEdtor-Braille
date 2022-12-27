@@ -65,7 +65,7 @@ class MapData {
 	public boolean isFinal() {return (type & FINAL) > 0;}
 	public boolean isModifier() {return (type & MODIFIER) > 0;}
 	public boolean isLigature() {return (type & LIGATURE) > 0 && (type & ~(LIGATURE | OVERFLOWS)) == 0;}
-	public boolean hasLigature() {return (type & (ALPHABET | LIGATURE)) > 0;}
+	public boolean hasLigature() {return ((type & ALPHABET) > 0 && (type & LIGATURE) > 0);}
 	public boolean isAlphabet() {return (type & ALPHABET) > 0;}
 	public boolean isCharacter() {return (type & CHARACTER) > 0;}
 	public boolean isOverflow() {return (type & OVERFLOWS) > 0;}
@@ -297,7 +297,6 @@ public class TextAreaBraille extends JTextArea {
 			}
 
 			// Deal with word locks of shift and digit
-			//if (isWhitespace(currentPinCode)) {
 			if (md.isWhitespace()) {
 				wordResets();
 				wordLength = 0;
@@ -446,6 +445,7 @@ public class TextAreaBraille extends JTextArea {
 								lastHistory.pinCodeList.get(lastHistory.pinCodeList.size() - 1);
 							MapData leftMapData = BRAILLE_MAP.get(lastAlphabetPinCode);	
 							MapData rightMapData = null;
+							log.info("LEFT MAP DATA TYPE: " + leftMapData.type);
 							if (leftMapData.hasLigature()) {
 								rightMapData = leftMapData.map.get(currentPinCode);
 							}
@@ -579,9 +579,8 @@ public class TextAreaBraille extends JTextArea {
 	private static void addLigaturesToBrailleMap() {
 		for (Integer[] ligature: LIGATURES.keySet()) {
 			addToBrailleMap(ligature, MapData.ALPHABET, LIGATURES.get(ligature));
-			// Specificakky disable OVERFLOWS for the left alphabet character.
-			int leftLetterType = BRAILLE_MAP.get(ligature[LEFT]).type;
-			leftLetterType = leftLetterType | ~MapData.OVERFLOWS;
+			// Specifically disable OVERFLOWS for the left alphabet character.
+			BRAILLE_MAP.get(ligature[LEFT]).type = (BRAILLE_MAP.get(ligature[LEFT]).type | MapData.LIGATURE) & ~MapData.OVERFLOWS;
 		}
 	}
 
