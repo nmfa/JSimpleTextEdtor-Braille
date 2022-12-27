@@ -635,6 +635,8 @@ public class TextAreaBraille extends JTextArea {
     private static void populateBrailleMap() {
 		// ENGLISH ALPHABET
 		addAlphabetsToBrailleMap();
+		addToBrailleMap(ENG, MapData.ALPHABET, join(new KeyData('ŋ', 331), new KeyData('Ŋ', 330)));
+		addToBrailleMap(SCHWA, MapData.ALPHABET, join(new KeyData('ə', 601), new KeyData('Ə', 399)));
 		addCombiningCharsToBrailleMap();
 		addToBrailleMap(LIGATURE, MapData.LIGATURE | MapData.OVERFLOWS, KD_LIGATURE);
 		addLigaturesToBrailleMap();
@@ -1114,6 +1116,7 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer[] TRADEMARK = join(SHIFT24, At);
 	private static final Integer[] FEMALE = join(SHIFT24, Ax);
 	private static final Integer[] MALE = join(SHIFT24, Ay);
+	private static final Integer[] ENG = join(SHIFT24, An);
 	// SHIFT 24 - COMBINING CHARACTERS
 	private static final Integer[] ACUTE = join(SHIFT24, 12);
 	private static final Integer[] CARON = join(SHIFT24, 44);
@@ -1134,6 +1137,7 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer[] BULLET = join(SHIFT56, FULLSTOP);
 	private static final Integer[] FORWARD_SLASH = join(SHIFT56, 12);
 	private static final Integer[] NUMBER = join(SHIFT56, N4);
+	private static final Integer[] SCHWA = join(SHIFT56, 34);
 
 	private static final HashMap<Integer[], KeyData[]> MODIFIERS = new HashMap<Integer[], KeyData[]>();
 	static {
