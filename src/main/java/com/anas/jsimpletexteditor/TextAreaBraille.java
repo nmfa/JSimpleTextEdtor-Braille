@@ -646,35 +646,40 @@ public class TextAreaBraille extends JTextArea {
  	
 		// NUMBERS
 		// COMPUTER NOTATION
-		for (Integer code: NUMBERS.keySet()) {
-			addCharToBrailleMap(code, NUMBERS.get(code));
+		addToBrailleMap(join(DIGIT, SHIFT16), MapData.CHARACTER | MapData.OVERFLOWS | MapData.STANDALONE, KD_SPACE);
+		for (int i = 0; i < 10; i++) {
+			addCharToBrailleMap(N_TEN[i], KD_TEN[i]);
+			addCharToBrailleMap(join(DIGIT, D_TEN[i]), KD_TEN[i]);
+			addCharToBrailleMap(join(DIGIT, SHIFT16, D_TEN[i]),  KD_TEN[i]);
 		}
-		// WITH DIGIT PREFIX: sets aren't ordered.
-        addCharToBrailleMap(D0, KD_0);
-        addCharToBrailleMap(D1, KD_1);
-        addCharToBrailleMap(D2, KD_2);
-        addCharToBrailleMap(D3, KD_3);
-        addCharToBrailleMap(D4, KD_4);
-        addCharToBrailleMap(D5, KD_5);
-        addCharToBrailleMap(D6, KD_6);
-        addCharToBrailleMap(D7, KD_7);
-        addCharToBrailleMap(D8, KD_8);
-        addCharToBrailleMap(D9, KD_9);
+		Integer[][] prefixes = {{DIGIT}, {DIGIT, SHIFT16}};
+		for (Integer[] prefix: prefixes) {
+			addStandAloneToBrailleMap(join(prefix, COMMA), KD_COMMA);
+			addStandAloneToBrailleMap(join(prefix, FULLSTOP), KD_FULLSTOP);
+			addCharToBrailleMap(join(prefix, EXCLAMATION), KD_PLUS);
+			addStandAloneToBrailleMap(join(prefix, HYPHEN), KD_MINUS);
+			addCharToBrailleMap(join(prefix, 20), KD_ASTERISK);
+			addStandAloneToBrailleMap(join(prefix, 12), KD_FORWARD_SLASH);
+			addStandAloneToBrailleMap(join(prefix, N1), KD_BACK_SLASH);
+			addCharToBrailleMap(join(prefix, PRIME), KD_EQUALS);
+			addStandAloneToBrailleMap(join(prefix, GROUP_OPEN), KD_LESS_THAN);
+			addStandAloneToBrailleMap(join(prefix, GROUP_CLOSE), KD_GREATER_THAN);
+		}
 
 		// MUSIC
         addCharToBrailleMap(SHARP, new KeyData('♯'));
 
 		// SIMPLE PUNCTUATION
 		addStandAloneToBrailleMap(APOSTROPHE, new KeyData('\''));
-		addStandAloneToBrailleMap(BACK_SLASH, new KeyData('\\', KeyEvent.VK_BACK_SLASH));
+		addStandAloneToBrailleMap(BACK_SLASH, KD_BACK_SLASH);
 		addStandAloneToBrailleMap(BULLET, new KeyData('•'));
 		addStandAloneToBrailleMap(CARET, new KeyData('^', true));
 		addStandAloneToBrailleMap(COLON, new KeyData(':', KeyEvent.VK_COLON, true));
-		addStandAloneToBrailleMap(COMMA, new KeyData(',', KeyEvent.VK_COMMA));
+		addStandAloneToBrailleMap(COMMA, KD_COMMA);
 		addStandAloneToBrailleMap(EXCLAMATION, new KeyData('!', KeyEvent.VK_EXCLAMATION_MARK, true));
-		addStandAloneToBrailleMap(FORWARD_SLASH, new KeyData('/', KeyEvent.VK_SLASH));
-		addStandAloneToBrailleMap(FULLSTOP, new KeyData('.', KeyEvent.VK_PERIOD));
-		addStandAloneToBrailleMap(HYPHEN, new KeyData('-', KeyEvent.VK_MINUS));
+		addStandAloneToBrailleMap(FORWARD_SLASH, KD_FORWARD_SLASH);
+		addStandAloneToBrailleMap(FULLSTOP, KD_FULLSTOP);
+		addStandAloneToBrailleMap(HYPHEN, KD_MINUS);
 		addStandAloneToBrailleMap(NUMBER, new KeyData('#'));
 		addToBrailleMap(join(PRIME), MapData.OVERFLOWS | MapData.CHARACTER | MapData.STANDALONE, new KeyData('′'));
 		addStandAloneToBrailleMap(QUESTION, new KeyData('?', true));
@@ -687,8 +692,8 @@ public class TextAreaBraille extends JTextArea {
 		addStandAloneToBrailleMap(DOUBLE_PRIME, KD_BACKSPACE, new KeyData('″'));
 
 		// GROUP PUNCTUATION
-		addStandAloneToBrailleMap(ANGLE_BRACKET_OPEN, new KeyData('<', true));
-		addStandAloneToBrailleMap(ANGLE_BRACKET_CLOSE, new KeyData('>', true));
+		addStandAloneToBrailleMap(ANGLE_BRACKET_OPEN, KD_LESS_THAN);
+		addStandAloneToBrailleMap(ANGLE_BRACKET_CLOSE, KD_GREATER_THAN);
 		addStandAloneToBrailleMap(CURLY_BRACKET_OPEN, new KeyData('{', true));
 		addStandAloneToBrailleMap(CURLY_BRACKET_CLOSE, new KeyData('}', true));
 		addStandAloneToBrailleMap(ROUND_BRACKET_OPEN, new KeyData('(', true));
@@ -706,14 +711,14 @@ public class TextAreaBraille extends JTextArea {
 		addCharToBrailleMap(YEN, new KeyData('¥'));
 
 		// MATHS
-		addStandAloneToBrailleMap(ASTERISK, new KeyData('*', KeyEvent.VK_ASTERISK, true));
+		addStandAloneToBrailleMap(ASTERISK, KD_ASTERISK);
 		addStandAloneToBrailleMap(DITTO, new KeyData('"', true));
 		addStandAloneToBrailleMap(DIVIDE, new KeyData('÷'));
-		addStandAloneToBrailleMap(EQUALS, new KeyData('=', KeyEvent.VK_EQUALS));
-		addStandAloneToBrailleMap(MINUS, new KeyData('-', KeyEvent.VK_MINUS));
+		addStandAloneToBrailleMap(EQUALS, KD_EQUALS);
+		addStandAloneToBrailleMap(MINUS, KD_MINUS);
 		addStandAloneToBrailleMap(MULTIPLY, new KeyData('×'));
 		addStandAloneToBrailleMap(PERCENT, new KeyData('\u0025', 37));
-		addStandAloneToBrailleMap(PLUS, new KeyData('+', KeyEvent.VK_PLUS, true));
+		addStandAloneToBrailleMap(PLUS, KD_PLUS);
 	
 		// SYMBOLS
 		addStandAloneToBrailleMap(AMPERSAND, new KeyData('&', true));
@@ -884,6 +889,18 @@ public class TextAreaBraille extends JTextArea {
 	private static final KeyData KD_GPSI = new KeyData('Ψ');
 	private static final KeyData KD_GOMEGA = new KeyData('Ω');
 
+	// PUNCTUATION
+	private static final KeyData KD_COMMA = new KeyData(',', KeyEvent.VK_COMMA);
+	private static final KeyData KD_FULLSTOP = new KeyData('.', KeyEvent.VK_PERIOD);
+	private static final KeyData KD_PLUS = new KeyData('+', KeyEvent.VK_PLUS);
+	private static final KeyData KD_MINUS = new KeyData('-', KeyEvent.VK_MINUS);
+	private static final KeyData KD_ASTERISK = new KeyData('*', KeyEvent.VK_ASTERISK);
+	private static final KeyData KD_FORWARD_SLASH = new KeyData('/', KeyEvent.VK_SLASH);
+	private static final KeyData KD_BACK_SLASH = new KeyData('\\', KeyEvent.VK_BACK_SLASH);
+	private static final KeyData KD_EQUALS = new KeyData('=', KeyEvent.VK_EQUALS);
+	private static final KeyData KD_LESS_THAN = new KeyData('<', true);
+	private static final KeyData KD_GREATER_THAN = new KeyData('>', true);
+
 	// NUMBERS
 	private static final KeyData KD_0 = new KeyData('0');
 	private static final KeyData KD_1 = new KeyData('1');
@@ -994,6 +1011,17 @@ public class TextAreaBraille extends JTextArea {
 	private static final int LEFT = 0;
 	private static final int RIGHT = 1;
 
+	// SIMPLE PUNCTUATION
+	private static final Integer APOSTROPHE = 4;
+	private static final Integer COLON = 18;
+	private static final Integer COMMA = 2;
+	private static final Integer EXCLAMATION = 22;
+	private static final Integer FULLSTOP = 50;
+	private static final Integer HYPHEN = 36;
+	private static final Integer PRIME = 54;
+	private static final Integer QUESTION = 38;
+	private static final Integer SEMICOLON = 6;
+
 	// LIGATURES
 	private static final HashMap<Integer[], KeyData[]> LIGATURES = new HashMap<Integer[], KeyData[]>();
 	static {
@@ -1012,7 +1040,6 @@ public class TextAreaBraille extends JTextArea {
 	}
 
 	// NUMBERS
-	private static final Integer N0 = 63;
 	private static final Integer N1 = 33;
 	private static final Integer N2 = 35;
 	private static final Integer N3 = 41;
@@ -1022,45 +1049,16 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer N7 = 59;
 	private static final Integer N8 = 51;
 	private static final Integer N9 = 42;
-	private static final Integer[] D1 = join(DIGIT, Aa);
-	private static final Integer[] D2 = join(DIGIT, Ab);
-	private static final Integer[] D3 = join(DIGIT, Ac);
-	private static final Integer[] D4 = join(DIGIT, Ad);
-	private static final Integer[] D5 = join(DIGIT, Ae);
-	private static final Integer[] D6 = join(DIGIT, Af);
-	private static final Integer[] D7 = join(DIGIT, Ag);
-	private static final Integer[] D8 = join(DIGIT, Ah);
-	private static final Integer[] D9 = join(DIGIT, Ai);
-	private static final Integer[] D0 = join(DIGIT, Aj);
-	private static final HashMap<Integer, KeyData> NUMBERS = new HashMap<Integer, KeyData>();
-	static {
-		NUMBERS.put(N0, KD_0);
-		NUMBERS.put(N1, KD_1);
-		NUMBERS.put(N2, KD_2);
-		NUMBERS.put(N3, KD_3);
-		NUMBERS.put(N4, KD_4);
-		NUMBERS.put(N5, KD_5);
-		NUMBERS.put(N6, KD_6);
-		NUMBERS.put(N7, KD_7);
-		NUMBERS.put(N8, KD_8);
-		NUMBERS.put(N9, KD_9);
-	}
+	private static final Integer N0 = 63;
+
+	private static final Integer[] N_TEN = join(N1, N2, N3, N4, N5, N6, N7, N8, N9, N0);
+	private static final Integer[] D_TEN = join(Aa, Ab, Ac, Ad, Ae, Af, Ag, Ah, Ai, Aj);
+	private static final KeyData[] KD_TEN = join(KD_1, KD_2, KD_3, KD_4, KD_5, KD_6, KD_7, KD_8, KD_9, KD_0);
 
 	// MUSIC
 	//private static final Integer[] NATURAL = join(DIGIT, N1); // No Arial char
 	//private static final Integer[] FLAT = join(DIGIT, GROUP_OPEN); // No Arial char
 	private static final Integer[] SHARP = join(DIGIT, N3);
-
-	// SIMPLE PUNCTUATION
-	private static final Integer APOSTROPHE = 4;
-	private static final Integer COLON = 18;
-	private static final Integer COMMA = 2;
-	private static final Integer EXCLAMATION = 22;
-	private static final Integer FULLSTOP = 50;
-	private static final Integer HYPHEN = 36;
-	private static final Integer PRIME = 54;
-	private static final Integer QUESTION = 38;
-	private static final Integer SEMICOLON = 6;
 
 	// COMPLEX PUNCTUATION
 	private static final Integer[] DOUBLE_PRIME = join(PRIME, PRIME);
