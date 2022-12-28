@@ -664,6 +664,7 @@ public class TextAreaBraille extends JTextArea {
 			addCharToBrailleMap(join(prefix, PRIME), KD_EQUALS);
 			addStandAloneToBrailleMap(join(prefix, GROUP_OPEN), KD_LESS_THAN);
 			addStandAloneToBrailleMap(join(prefix, GROUP_CLOSE), KD_GREATER_THAN);
+			addStandAloneToBrailleMap(join(prefix, COLON), KD_COLON);
 		}
 
 		// MUSIC
@@ -674,7 +675,7 @@ public class TextAreaBraille extends JTextArea {
 		addStandAloneToBrailleMap(BACK_SLASH, KD_BACK_SLASH);
 		addStandAloneToBrailleMap(BULLET, new KeyData('•'));
 		addStandAloneToBrailleMap(CARET, new KeyData('^', true));
-		addStandAloneToBrailleMap(COLON, new KeyData(':', KeyEvent.VK_COLON, true));
+		addStandAloneToBrailleMap(COLON, KD_COLON);
 		addStandAloneToBrailleMap(COMMA, KD_COMMA);
 		addStandAloneToBrailleMap(EXCLAMATION, new KeyData('!', KeyEvent.VK_EXCLAMATION_MARK, true));
 		addStandAloneToBrailleMap(FORWARD_SLASH, KD_FORWARD_SLASH);
@@ -900,6 +901,7 @@ public class TextAreaBraille extends JTextArea {
 	private static final KeyData KD_EQUALS = new KeyData('=', KeyEvent.VK_EQUALS);
 	private static final KeyData KD_LESS_THAN = new KeyData('<', true);
 	private static final KeyData KD_GREATER_THAN = new KeyData('>', true);
+	private static final KeyData KD_COLON = new KeyData(':', KeyEvent.VK_COLON, true);
 
 	// NUMBERS
 	private static final KeyData KD_0 = new KeyData('0');
