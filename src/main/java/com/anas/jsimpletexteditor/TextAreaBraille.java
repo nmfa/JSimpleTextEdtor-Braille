@@ -24,7 +24,7 @@ class MapData {
 	public static final int FINAL = 120;
 	public static final int CONCRETE = 126;
 
-	public ArrayList<KeyData> keyData;
+	public ArrayList<ArrayList<KeyData>> keyData;
 	public HashMap<Integer, MapData> map;
 	public int type;
     Logger log = Logger.getLogger("MapData");
@@ -35,15 +35,22 @@ class MapData {
 		this.type = OVERFLOWS;
 	}
 
-	MapData(KeyData kd, int tp) {
-		this(new ArrayList<KeyData>(Arrays.asList(kd)), tp);
+	MapData(int tp, KeyData[] kdLower, KeyData[] kdUpper) {
+		this(tp, new ArrayList<KeyData>(Arrays.asList(kdLower)), new ArrayList<KeyData>(Arrays.asList(kdUpper)));
 	}
 
-	MapData(KeyData[] kd, int tp) {
-		this(new ArrayList<KeyData>(Arrays.asList(kd)), tp);
+	// Can't use List.of as arguments could be null.
+	private static ArrayList<ArrayList<KeyData>> listOf(ArrayList<KeyData> kdLower, ArrayList<KeyData> kdUpper) {
+		ArrayList<ArrayList<KeyData>> result = new ArrayList<ArrayList<KeyData>>();
+		result.add(kdLower);
+		result.add(kdUpper);
+		return result;
+	}
+	MapData(int tp, ArrayList<KeyData> kdLower, ArrayList<KeyData> kdUpper) {
+		this(tp, listOf(kdLower, kdUpper));
 	}
 
-	MapData(ArrayList<KeyData> kd, int tp) {
+	MapData(int tp, ArrayList<ArrayList<KeyData>> kd) {
 		this.keyData = kd;
 		this.map = null;
 		this.type = tp;
@@ -60,6 +67,20 @@ class MapData {
 		type = type | OVERFLOWS;
 	}
 
+	public ArrayList<KeyData> getKeyData() {
+		return getKeyData(false);
+	}
+
+	public ArrayList<KeyData> getKeyData(boolean shift) {
+		if ((isAlphabet() && !isCharacter()) || isString()) {
+			return keyData.get((shift) ? 1 : 0);
+		} else if (isCharacter() || isWhitespace()) {
+			return keyData.get(0);
+		} else {
+			return null;
+		}
+	}
+
 	public boolean overflows() {return (type & OVERFLOWS) > 0;}
 	public boolean isConcrete() {return (type & CONCRETE) > 0;}
 	public boolean isFinal() {return (type & FINAL) > 0;}
@@ -67,6 +88,7 @@ class MapData {
 	public boolean isLigature() {return (type & LIGATURE) > 0 && (type & ~(LIGATURE | OVERFLOWS)) == 0;}
 	public boolean hasLigature() {return ((type & ALPHABET) > 0 && (type & LIGATURE) > 0);}
 	public boolean isAlphabet() {return (type & ALPHABET) > 0;}
+	public boolean isString() {return (type & STRING) > 0;}
 	public boolean isCharacter() {return (type & CHARACTER) > 0;}
 	public boolean isOverflow() {return (type & OVERFLOWS) > 0;}
 	public boolean isWhitespace() {return (type & WHITESPACE) > 0;}
@@ -148,8 +170,8 @@ public class TextAreaBraille extends JTextArea {
     TextAreaBraille() {
         super();
 		// Initialise as if we've just had whitespace, arbitrarily ENTER.
-		recentHistory.add(new History(new ArrayList<Integer>(Arrays.asList(ENTER)), BRAILLE_MAP.get(ENTER), BRAILLE_MAP.get(ENTER).keyData));
-		recentHistory.add(new History(new ArrayList<Integer>(Arrays.asList(ENTER)), BRAILLE_MAP.get(ENTER), BRAILLE_MAP.get(ENTER).keyData));
+		recentHistory.add(new History(new ArrayList<Integer>(Arrays.asList(ENTER)), BRAILLE_MAP.get(ENTER), BRAILLE_MAP.get(ENTER).getKeyData()));
+		recentHistory.add(new History(new ArrayList<Integer>(Arrays.asList(ENTER)), BRAILLE_MAP.get(ENTER), BRAILLE_MAP.get(ENTER).getKeyData()));
     }
 
 
@@ -200,8 +222,8 @@ public class TextAreaBraille extends JTextArea {
 				break;
 
 			case KeyEvent.VK_BACK_SPACE:
-				sendKeyEvents(e.getComponent(), e. getWhen(), BRAILLE_MAP.get(-keyCode).keyData);
-				updateRecentHistory(BRAILLE_MAP.get(-keyCode), BRAILLE_MAP.get(-keyCode).keyData);
+				sendKeyEvents(e.getComponent(), e. getWhen(), BRAILLE_MAP.get(-keyCode).getKeyData());
+				updateRecentHistory(BRAILLE_MAP.get(-keyCode), BRAILLE_MAP.get(-keyCode).getKeyData());
 				wordResets();
 				currentPinCodesList.clear();
 				qualifyPinCode();
@@ -277,17 +299,18 @@ public class TextAreaBraille extends JTextArea {
 			if (md.keyData != null) {
 				// Send character sequence.
 				if (md.isAlphabet() && !md.isCharacter()) {
-					int aCase = (shift.isOn()) ? UPPER : LOWER;
-					sendKeyEvents(e.getComponent(), e.getWhen(), md.keyData.get(aCase));
-					updateRecentHistory(md, md.keyData.get(aCase));
+					ArrayList<KeyData> kd = md.getKeyData(shift.isOn());
+					sendKeyEvents(e.getComponent(), e.getWhen(), kd);
+					updateRecentHistory(md, kd);
 					wordLength++;
 				} else if (md.isFinal()) {
-					sendKeyEvents(e.getComponent(), e.getWhen(), md.keyData);
+					ArrayList<KeyData> kd = md.getKeyData();
+					sendKeyEvents(e.getComponent(), e.getWhen(), kd);
 					// This will not be quite accurate for many modified letters,
 					// but they can't be part of contractions, and that is the purpose
 					// of wordLength.
 					wordLength += md.keyData.size();
-					updateRecentHistory(md, md.keyData);
+					updateRecentHistory(md, kd);
 				}
 			}
 			//if (pinCodeOverflow == 0) {
@@ -341,10 +364,6 @@ public class TextAreaBraille extends JTextArea {
 		if (digit.isOn()) currentPinCodesList.add(DIGIT);
 	}
 
-	private void updateRecentHistory(MapData md, KeyData... kd) {
-		updateRecentHistory(md, new ArrayList<KeyData>(Arrays.asList(kd)));
-	}
-
 	private void updateRecentHistory(MapData md, ArrayList<KeyData> kd) {
 		recentHistory.removeFirst();
 		recentHistory.addLast(new History(currentPinCodesList, md, kd));
@@ -395,7 +414,6 @@ public class TextAreaBraille extends JTextArea {
 		// I really want to pass and update this in a couple of helper functions.
 		// For such limited use this is probably the most efficient way, if a little ugly.
 		int[] pcIndex = {0};
-		int aCase = (shift.isOn()) ? UPPER : LOWER;
 		MapData mdModifier = null;
 		MapData mdLigature = null;
 
@@ -426,11 +444,11 @@ public class TextAreaBraille extends JTextArea {
 						MapData mdModified =
 							getModifiedAlphabet(mdModifier, currentPinCode);
 						if (mdModified == null) {
-							result = new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.ALPHABET | MapData.CHARACTER);
+							result = new MapData(MapData.ALPHABET | MapData.CHARACTER, join(md.getKeyData(shift.isOn()), mdModifier.getKeyData()), null);
 						} else {
 							// On rare combinations there is only a normalized char for one case.
-							if (mdModified.keyData.get(aCase).keyCode == 0) {
-								result = new MapData(join(md.keyData.get(aCase), mdModifier.keyData.get(0)), MapData.ALPHABET | MapData.CHARACTER); 
+							if (mdModified.getKeyData(shift.isOn()) == null) {
+								result = new MapData(MapData.ALPHABET | MapData.CHARACTER, join(md.getKeyData(shift.isOn()), mdModifier.getKeyData()), null); 
 							} else {
 								result = mdModified;
 							}
@@ -449,18 +467,18 @@ public class TextAreaBraille extends JTextArea {
 							if (leftMapData.hasLigature()) {
 								rightMapData = leftMapData.map.get(currentPinCode);
 							}
-							if (rightMapData != null && rightMapData.keyData.get(aCase) != KD_NULL) {
-								result = new MapData(join(KD_BACKSPACE, rightMapData.keyData.get(aCase)), MapData.ALPHABET | MapData.CHARACTER);
+							if (rightMapData != null && rightMapData.getKeyData(shift.isOn()) != null) {
+								result = new MapData(MapData.ALPHABET | MapData.CHARACTER, join(KD_BACKSPACE, rightMapData.getKeyData(shift.isOn())), null);
 							} else {
 								ArrayList<KeyData> lkd = new ArrayList<KeyData>();
 								lkd.add(KD_LIGATURE[LEFT]);
 								if (md.isAlphabet()) {
-									lkd.add(md.keyData.get(aCase));
+									lkd.addAll(md.getKeyData(shift.isOn()));
 								} else {
-									lkd.addAll(md.keyData);
+									lkd.addAll(md.getKeyData());
 								}
 								lkd.add(KD_LIGATURE[RIGHT]);
-								result = new MapData(lkd, MapData.ALPHABET | MapData.CHARACTER);
+								result = new MapData(MapData.ALPHABET | MapData.CHARACTER, lkd, null);
 							}
 						}
 					}
@@ -512,59 +530,58 @@ public class TextAreaBraille extends JTextArea {
 	private static void addAlphabetsToBrailleMap() {
 		for (Integer code: ALPHABET.keySet()) {
 			Integer[] codes = {code};
-			addToBrailleMap(codes, MapData.ALPHABET, ALPHABET.get(code));
+			addToBrailleMap(codes, MapData.ALPHABET, ALPHABET.get(code)[LOWER], ALPHABET.get(code)[UPPER]);
 		}
 		for (Integer[] codes: GREEK.keySet()) {
-			addToBrailleMap(codes, MapData.ALPHABET, GREEK.get(codes));
+			addToBrailleMap(codes, MapData.ALPHABET, GREEK.get(codes)[LOWER], GREEK.get(codes)[UPPER]);
 		}
 	}
 
 	private static void addCombiningCharsToBrailleMap() {
 		for (Integer[] mCodes: MODIFIERS.keySet()) {
 			KeyData[] mKeyData = MODIFIERS.get(mCodes);
-			addToBrailleMap(mCodes, MapData.MODIFIER | MapData.OVERFLOWS, mKeyData);
+			addToBrailleMap(mCodes, MapData.MODIFIER | MapData.OVERFLOWS, mKeyData, null);
 			for (int aCode: ALPHABET.keySet()) {
 				// THe expectation is that these will be pairs of lower and upper case modified characters.
 				boolean modifiedPair = false;
 				KeyData[] pair = new KeyData[2];
-				KeyData[] aKeyData = ALPHABET.get(aCode);
-				String combination = String.valueOf(aKeyData[LOWER].keyChar) + String.valueOf(mKeyData[0].keyChar);
+				KeyData[][] aKeyData = ALPHABET.get(aCode);
+				String combination = String.valueOf(aKeyData[LOWER][0].keyChar) + String.valueOf(mKeyData[0].keyChar);
 				char keyChar = Normalizer.normalize(combination, Form.NFC).charAt(0);
-				if (keyChar != aKeyData[LOWER].keyChar) {
+				if (keyChar != aKeyData[LOWER][0].keyChar) {
 					pair[LOWER] = new KeyData(keyChar);
 					modifiedPair = true;
 				}
-				combination = String.valueOf(aKeyData[UPPER].keyChar) + String.valueOf(mKeyData[0].keyChar);
+				combination = String.valueOf(aKeyData[UPPER][0].keyChar) + String.valueOf(mKeyData[0].keyChar);
 				keyChar = Normalizer.normalize(combination, Form.NFC).charAt(0);
-				if (keyChar != aKeyData[UPPER].keyChar) {
+				if (keyChar != aKeyData[UPPER][0].keyChar) {
 					pair[UPPER] = new KeyData(keyChar);
 					if (!modifiedPair) {
-						pair[LOWER] = KD_NULL;
-						log.warning("UPPER MODIFIED CHARACTER, BUT NO LOWER: " + aKeyData[LOWER].keyChar + String.format("\\u%04x", (int) mKeyData[0].keyChar));
+						pair[LOWER] = null;
+						log.warning("UPPER MODIFIED CHARACTER, BUT NO LOWER: " + aKeyData[LOWER][0].keyChar + String.format("\\u%04x", (int) mKeyData[0].keyChar));
 					}
 					modifiedPair = true;
 				} else if (modifiedPair) {
-					pair[UPPER] = KD_NULL;
-					log.warning("LOWER MODIFIED CHARACTER, BUT NO UPPER: " + aKeyData[UPPER].keyChar + String.format("\\u%04x", (int) mKeyData[0].keyChar));
+					pair[UPPER] = null;
+					log.warning("LOWER MODIFIED CHARACTER, BUT NO UPPER: " + aKeyData[UPPER][0].keyChar + String.format("\\u%04x", (int) mKeyData[0].keyChar));
 				}
 				if (modifiedPair) {
-					addToBrailleMap(join(mCodes, aCode), MapData.ALPHABET | MapData.MODIFIER, pair);
+					addToBrailleMap(join(mCodes, aCode), MapData.ALPHABET | MapData.MODIFIER, pair[LOWER], pair[UPPER]);
 				}
 			}
 		}
 	}
 
 	private static void addCharToBrailleMap(Integer[] pinCodes, KeyData... keyData) {
-		addToBrailleMap(pinCodes, MapData.CHARACTER, keyData);
+		addToBrailleMap(pinCodes, MapData.CHARACTER, keyData, null);
 	}
-
 	private static void addCharToBrailleMap(Integer pinCode, KeyData... keyData) {
 		Integer[] pinCodes = {pinCode};
 		addCharToBrailleMap(pinCodes, keyData);
 	}
 
 	private static void addStandAloneToBrailleMap(Integer[] pinCodes, KeyData... keyData) {
-		addToBrailleMap(pinCodes, MapData.CHARACTER | MapData.STANDALONE, keyData);
+		addToBrailleMap(pinCodes, MapData.CHARACTER | MapData.STANDALONE, keyData, null);
 	}
 	private static void addStandAloneToBrailleMap(Integer pinCode, KeyData... keyData) {
 		Integer[] pinCodes = {pinCode};
@@ -573,23 +590,45 @@ public class TextAreaBraille extends JTextArea {
 
 	private static void addWhitespaceToBrailleMap(Integer pinCode, KeyData... keyData) {
 		Integer[] pinCodes = {pinCode};
-		addToBrailleMap(pinCodes, MapData.WHITESPACE | MapData.STANDALONE, keyData);
+		addToBrailleMap(pinCodes, MapData.WHITESPACE | MapData.STANDALONE, keyData, null);
 	}
 
 	private static void addLigaturesToBrailleMap() {
 		for (Integer[] ligature: LIGATURES.keySet()) {
-			addToBrailleMap(ligature, MapData.ALPHABET, LIGATURES.get(ligature));
+			addToBrailleMap(ligature, MapData.ALPHABET, LIGATURES.get(ligature)[LOWER], LIGATURES.get(ligature)[UPPER]);
 			// Specifically disable OVERFLOWS for the left alphabet character.
 			BRAILLE_MAP.get(ligature[LEFT]).type = (BRAILLE_MAP.get(ligature[LEFT]).type | MapData.LIGATURE) & ~MapData.OVERFLOWS;
 		}
 	}
 
-	private static void addToBrailleMap(Integer[] pinCodes, int type, KeyData... keyData) {
-		addToBrailleMap(pinCodes, type, 0, new ArrayList<KeyData>(Arrays.asList(keyData)), BRAILLE_MAP);
+	private static void addToBrailleMap(Integer[] pinCodes, int type, KeyData keyDataLower, KeyData keyDataUpper) {
+		addToBrailleMap(pinCodes,
+						type,
+						new KeyData[] {keyDataLower},
+						new KeyData[] {keyDataUpper});
 	}
 
-	private static void addToBrailleMap(Integer[] pinCodes, int type, int pcIndex, ArrayList<KeyData> keyData, HashMap<Integer, MapData> map) {
+	private static void addToBrailleMap(Integer[] pinCodes, int type, KeyData[] keyDataLower, KeyData[] keyDataUpper) {
+		addToBrailleMap(pinCodes,
+						type,
+						0,
+						new ArrayList<KeyData>(Arrays.asList(keyDataLower)),
+						(keyDataUpper == null) ? null : new ArrayList<KeyData>(Arrays.asList(keyDataUpper)),
+						BRAILLE_MAP);
+	}
+
+	private static void addToBrailleMap(Integer[] pinCodes,
+										int type,
+										int pcIndex,
+										ArrayList<KeyData> keyDataLower,
+										ArrayList<KeyData> keyDataUpper,
+										HashMap<Integer, MapData> map) {
 		MapData mapData =  map.get(pinCodes[pcIndex]);
+		ArrayList<ArrayList<KeyData>> keyData = new ArrayList<ArrayList<KeyData>>();
+		keyData.add(keyDataLower);
+		if (keyDataUpper != null) {
+			keyData.add(keyDataUpper);
+		}
 		if (mapData != null) {
 			if (pcIndex + 1 == pinCodes.length) {
 				if (mapData.keyData != null) {
@@ -605,16 +644,16 @@ public class TextAreaBraille extends JTextArea {
 				// In the case where KeyData exists, but the same symbol can also be part of a combination
 				// eg: rime & double prime
 				if (mapData.map == null) mapData.addMap();
-				addToBrailleMap(pinCodes, type, pcIndex + 1, keyData, mapData.map);
+				addToBrailleMap(pinCodes, type, pcIndex + 1, keyDataLower, keyDataUpper, mapData.map);
 			}
 		} else {
 			if (pcIndex + 1 == pinCodes.length) {
-				MapData md = new MapData(keyData, type);
+				MapData md = new MapData(type, keyData);
 				map.put(pinCodes[pcIndex], md);
 			} else {
 				MapData md = new MapData();
 				map.put(pinCodes[pcIndex], md);
-				addToBrailleMap(pinCodes, type, pcIndex + 1, keyData, md.map);
+				addToBrailleMap(pinCodes, type, pcIndex + 1, keyDataLower, keyDataUpper, md.map);
 			}
 		}
 	}
@@ -630,15 +669,38 @@ public class TextAreaBraille extends JTextArea {
 		System.arraycopy(items, 0, newArr, arr.length, items.length);
 		return newArr;
 	}
+	@SafeVarargs
+	private static <T> ArrayList<T> join(ArrayList<T>... items) {
+		ArrayList<T> result = new ArrayList<T>();
+		for (ArrayList<T> item: items) {
+			result.addAll(item);
+		}
+		return result;
+	}
+	private static <T> ArrayList<T> join (T item, ArrayList<T> itemAL) {
+		ArrayList<T> result = new ArrayList<T>();
+		result.add(item);
+		result.addAll(itemAL);
+		return result;
+	}
+
+	private static KeyData[][] link(KeyData kdLower, KeyData kdUpper) {
+		return link(new KeyData[] {kdLower}, new KeyData[] {kdUpper});
+	}
+
+	private static KeyData[][] link(KeyData[] kdLower, KeyData[] kdUpper) {
+		KeyData[][] result = {kdLower, kdUpper};
+		return result;
+	}
 
 
     private static void populateBrailleMap() {
 		// ENGLISH ALPHABET
 		addAlphabetsToBrailleMap();
-		addToBrailleMap(ENG, MapData.ALPHABET, join(new KeyData('ŋ', 331), new KeyData('Ŋ', 330)));
-		addToBrailleMap(SCHWA, MapData.ALPHABET, join(new KeyData('ə', 601), new KeyData('Ə', 399)));
+		addToBrailleMap(ENG, MapData.ALPHABET, new KeyData('ŋ', 331), new KeyData('Ŋ', 330));
+		addToBrailleMap(SCHWA, MapData.ALPHABET, new KeyData('ə', 601), new KeyData('Ə', 399));
 		addCombiningCharsToBrailleMap();
-		addToBrailleMap(LIGATURE, MapData.LIGATURE | MapData.OVERFLOWS, KD_LIGATURE);
+		addToBrailleMap(LIGATURE, MapData.LIGATURE | MapData.OVERFLOWS, KD_LIGATURE, null);
 		addLigaturesToBrailleMap();
 
 		addWhitespaceToBrailleMap(ENTER, KD_ENTER);
@@ -646,7 +708,7 @@ public class TextAreaBraille extends JTextArea {
  	
 		// NUMBERS
 		// COMPUTER NOTATION
-		addToBrailleMap(join(DIGIT, SHIFT16), MapData.CHARACTER | MapData.OVERFLOWS | MapData.STANDALONE, KD_SPACE);
+		addToBrailleMap(join(DIGIT, SHIFT16), MapData.CHARACTER | MapData.OVERFLOWS | MapData.STANDALONE, KD_SPACE, null);
 		for (int i = 0; i < 10; i++) {
 			addCharToBrailleMap(N_TEN[i], KD_TEN[i]);
 			addCharToBrailleMap(join(DIGIT, D_TEN[i]), KD_TEN[i]);
@@ -671,6 +733,8 @@ public class TextAreaBraille extends JTextArea {
         addCharToBrailleMap(SHARP, new KeyData('♯'));
 
 		// SIMPLE PUNCTUATION
+		addStandAloneToBrailleMap(ANGLE_QUOTE_OPEN, new KeyData('«'));
+		addStandAloneToBrailleMap(ANGLE_QUOTE_CLOSE, new KeyData('»'));
 		addStandAloneToBrailleMap(APOSTROPHE, new KeyData('\''));
 		addStandAloneToBrailleMap(BACK_SLASH, KD_BACK_SLASH);
 		addStandAloneToBrailleMap(BULLET, new KeyData('•'));
@@ -682,15 +746,17 @@ public class TextAreaBraille extends JTextArea {
 		addStandAloneToBrailleMap(FULLSTOP, KD_FULLSTOP);
 		addStandAloneToBrailleMap(HYPHEN, KD_MINUS);
 		addStandAloneToBrailleMap(NUMBER, new KeyData('#'));
-		addToBrailleMap(join(PRIME), MapData.OVERFLOWS | MapData.CHARACTER | MapData.STANDALONE, new KeyData('′'));
-		addStandAloneToBrailleMap(QUESTION, new KeyData('?', true));
-		//addCharToBrailleMap(QUOTE, new KeyData('"', true));
+		addToBrailleMap(join(PRIME), MapData.ALPHABET | MapData.OVERFLOWS | MapData.STANDALONE, new KeyData('′'), KD_QUOTE);
+		addStandAloneToBrailleMap(QUOTE_OPEN, new KeyData('“'));
+		addStandAloneToBrailleMap(QUOTE_CLOSE, new KeyData('”'));
 		addStandAloneToBrailleMap(SEMICOLON, new KeyData(';', KeyEvent.VK_SEMICOLON));
 		addStandAloneToBrailleMap(TILDE, new KeyData('~', true));
 		addCharToBrailleMap(UNDERSCORE, new KeyData('_', KeyEvent.VK_UNDERSCORE, true));
 
 		// COMPLEX PUNCTUATION
-		addStandAloneToBrailleMap(DOUBLE_PRIME, KD_BACKSPACE, new KeyData('″'));
+		addToBrailleMap(join(QUESTION), MapData.ALPHABET | MapData.STANDALONE, new KeyData('?'), new KeyData('‘'));
+		addToBrailleMap(join(QUESTION_INVERTED), MapData.ALPHABET | MapData.STANDALONE, new KeyData('¿'), new KeyData('’'));
+		addToBrailleMap(DOUBLE_PRIME, MapData.ALPHABET | MapData.STANDALONE, join(KD_BACKSPACE, new KeyData('″')), join(KD_QUOTE));
 
 		// GROUP PUNCTUATION
 		addStandAloneToBrailleMap(ANGLE_BRACKET_OPEN, KD_LESS_THAN);
@@ -755,15 +821,11 @@ public class TextAreaBraille extends JTextArea {
     }
 
 	private static final Integer BACKSPACE = -KeyEvent.VK_BACK_SPACE;
-	private static final Integer WHITESPACE = 0;
 
 	// SOME COMMON KEYDATA
-	private static final KeyData KD_NULL = new KeyData(' ', 0);
 	private static final KeyData KD_BACKSPACE = new KeyData('\b', KeyEvent.VK_BACK_SPACE);
 	private static final KeyData KD_ENTER = new KeyData('\n', KeyEvent.VK_ENTER);
 	private static final KeyData KD_SPACE = new KeyData(' ', KeyEvent.VK_SPACE);
-	private static final KeyData KD_WHITESPACE = new KeyData(' ', WHITESPACE);
-	private static final KeyData[] KD_WHITESPACES = { KD_SPACE, KD_ENTER };
 
 	// STANDARD ALPHABET KEYDATA
 	private static final KeyData KD_Aa = new KeyData('a');
@@ -902,6 +964,7 @@ public class TextAreaBraille extends JTextArea {
 	private static final KeyData KD_LESS_THAN = new KeyData('<', true);
 	private static final KeyData KD_GREATER_THAN = new KeyData('>', true);
 	private static final KeyData KD_COLON = new KeyData(':', KeyEvent.VK_COLON, true);
+	private static final KeyData KD_QUOTE = new KeyData('"', true);
 
 	// NUMBERS
 	private static final KeyData KD_0 = new KeyData('0');
@@ -979,34 +1042,34 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer Ax = 45;
 	private static final Integer Ay = 61;
 	private static final Integer Az = 53;
-	private static final HashMap<Integer, KeyData[]> ALPHABET = new HashMap<Integer, KeyData[]>();
+	private static final HashMap<Integer, KeyData[][]> ALPHABET = new HashMap<Integer, KeyData[][]>();
 	static {
-		ALPHABET.put(Aa, new KeyData[] {KD_Aa, KD_AA});
-		ALPHABET.put(Ab, new KeyData[] {KD_Ab, KD_AB});
-		ALPHABET.put(Ac, new KeyData[] {KD_Ac, KD_AC});
-		ALPHABET.put(Ad, new KeyData[] {KD_Ad, KD_AD});
-		ALPHABET.put(Ae, new KeyData[] {KD_Ae, KD_AE});
-		ALPHABET.put(Af, new KeyData[] {KD_Af, KD_AF});
-		ALPHABET.put(Ag, new KeyData[] {KD_Ag, KD_AG});
-		ALPHABET.put(Ah, new KeyData[] {KD_Ah, KD_AH});
-		ALPHABET.put(Ai, new KeyData[] {KD_Ai, KD_AI});
-		ALPHABET.put(Aj, new KeyData[] {KD_Aj, KD_AJ});
-		ALPHABET.put(Ak, new KeyData[] {KD_Ak, KD_AK});
-		ALPHABET.put(Al, new KeyData[] {KD_Al, KD_AL});
-		ALPHABET.put(Am, new KeyData[] {KD_Am, KD_AM});
-		ALPHABET.put(An, new KeyData[] {KD_An, KD_AN});
-		ALPHABET.put(Ao, new KeyData[] {KD_Ao, KD_AO});
-		ALPHABET.put(Ap, new KeyData[] {KD_Ap, KD_AP});
-		ALPHABET.put(Aq, new KeyData[] {KD_Aq, KD_AQ});
-		ALPHABET.put(Ar, new KeyData[] {KD_Ar, KD_AR});
-		ALPHABET.put(As, new KeyData[] {KD_As, KD_AS});
-		ALPHABET.put(At, new KeyData[] {KD_At, KD_AT});
-		ALPHABET.put(Au, new KeyData[] {KD_Au, KD_AU});
-		ALPHABET.put(Av, new KeyData[] {KD_Av, KD_AV});
-		ALPHABET.put(Aw, new KeyData[] {KD_Aw, KD_AW});
-		ALPHABET.put(Ax, new KeyData[] {KD_Ax, KD_AX});
-		ALPHABET.put(Ay, new KeyData[] {KD_Ay, KD_AY});
-		ALPHABET.put(Az, new KeyData[] {KD_Az, KD_AZ});
+		ALPHABET.put(Aa, link(KD_Aa, KD_AA));
+		ALPHABET.put(Ab, link(KD_Ab, KD_AB));
+		ALPHABET.put(Ac, link(KD_Ac, KD_AC));
+		ALPHABET.put(Ad, link(KD_Ad, KD_AD));
+		ALPHABET.put(Ae, link(KD_Ae, KD_AE));
+		ALPHABET.put(Af, link(KD_Af, KD_AF));
+		ALPHABET.put(Ag, link(KD_Ag, KD_AG));
+		ALPHABET.put(Ah, link(KD_Ah, KD_AH));
+		ALPHABET.put(Ai, link(KD_Ai, KD_AI));
+		ALPHABET.put(Aj, link(KD_Aj, KD_AJ));
+		ALPHABET.put(Ak, link(KD_Ak, KD_AK));
+		ALPHABET.put(Al, link(KD_Al, KD_AL));
+		ALPHABET.put(Am, link(KD_Am, KD_AM));
+		ALPHABET.put(An, link(KD_An, KD_AN));
+		ALPHABET.put(Ao, link(KD_Ao, KD_AO));
+		ALPHABET.put(Ap, link(KD_Ap, KD_AP));
+		ALPHABET.put(Aq, link(KD_Aq, KD_AQ));
+		ALPHABET.put(Ar, link(KD_Ar, KD_AR));
+		ALPHABET.put(As, link(KD_As, KD_AS));
+		ALPHABET.put(At, link(KD_At, KD_AT));
+		ALPHABET.put(Au, link(KD_Au, KD_AU));
+		ALPHABET.put(Av, link(KD_Av, KD_AV));
+		ALPHABET.put(Aw, link(KD_Aw, KD_AW));
+		ALPHABET.put(Ax, link(KD_Ax, KD_AX));
+		ALPHABET.put(Ay, link(KD_Ay, KD_AY));
+		ALPHABET.put(Az, link(KD_Az, KD_AZ));
 	}
 	private static final int LOWER = 0;
 	private static final int UPPER = 1;
@@ -1022,23 +1085,24 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer HYPHEN = 36;
 	private static final Integer PRIME = 54;
 	private static final Integer QUESTION = 38;
+	private static final Integer QUESTION_INVERTED = 52;
 	private static final Integer SEMICOLON = 6;
 
 	// LIGATURES
-	private static final HashMap<Integer[], KeyData[]> LIGATURES = new HashMap<Integer[], KeyData[]>();
+	private static final HashMap<Integer[], KeyData[][]> LIGATURES = new HashMap<Integer[], KeyData[][]>();
 	static {
-		LIGATURES.put(join(Aa, Ae), join(KD_Lae, KD_LAE));
-		LIGATURES.put(join(Af, Af), join(KD_Lff, KD_NULL));
-		LIGATURES.put(join(Af, Af, Ai), join(KD_Lffi, KD_NULL));
-		LIGATURES.put(join(Af, Af, Al), join(KD_Lffl, KD_NULL));
-		LIGATURES.put(join(Af, Ai), join(KD_Lfi, KD_NULL));
-		LIGATURES.put(join(Af, Al), join(KD_Lfl, KD_NULL));
-		LIGATURES.put(join(Af, At), join(KD_Lft, KD_NULL));
-		LIGATURES.put(join(Ai, Aj), join(KD_Lij, KD_LIJ));
-		LIGATURES.put(join(Ao, Ae), join(KD_Loe, KD_LOE));
-		LIGATURES.put(join(At, Ah), join(KD_Lth, KD_LTH));
-		LIGATURES.put(join(As, At), join(KD_Lst, KD_NULL));
-		LIGATURES.put(join(Au, Ae), join(KD_Lue, KD_NULL));
+		LIGATURES.put(join(Aa, Ae), link(KD_Lae, KD_LAE));
+		LIGATURES.put(join(Af, Af), link(KD_Lff, null));
+		LIGATURES.put(join(Af, Af, Ai), link(KD_Lffi, null));
+		LIGATURES.put(join(Af, Af, Al), link(KD_Lffl, null));
+		LIGATURES.put(join(Af, Ai), link(KD_Lfi, null));
+		LIGATURES.put(join(Af, Al), link(KD_Lfl, null));
+		LIGATURES.put(join(Af, At), link(KD_Lft, null));
+		LIGATURES.put(join(Ai, Aj), link(KD_Lij, KD_LIJ));
+		LIGATURES.put(join(Ao, Ae), link(KD_Loe, KD_LOE));
+		LIGATURES.put(join(At, Ah), link(KD_Lth, KD_LTH));
+		LIGATURES.put(join(As, At), link(KD_Lst, null));
+		LIGATURES.put(join(Au, Ae), link(KD_Lue, null));
 	}
 
 	// NUMBERS
@@ -1111,6 +1175,8 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer[] COPYRIGHT = join(SHIFT24, Ac);
 	private static final Integer[] DEGREES = join(SHIFT24, Aj);
 	private static final Integer[] PARAGRAPH = join(SHIFT24, Ap);
+	private static final Integer[] QUOTE_OPEN = join(SHIFT24, QUESTION);
+	private static final Integer[] QUOTE_CLOSE = join(SHIFT24, QUESTION_INVERTED);
 	private static final Integer[] REGISTERED = join(SHIFT24, Ar);
 	private static final Integer[] SECTION = join(SHIFT24, As);
 	private static final Integer[] TRADEMARK = join(SHIFT24, At);
@@ -1129,10 +1195,12 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer[] LIGATURE = join(SHIFT24, EXCLAMATION);
 
 	// SHIFT 40
-	private static final Integer[] PERCENT = join(SHIFT40, 52);
+	private static final Integer[] PERCENT = join(SHIFT40, QUESTION_INVERTED);
 	private static final Integer[] UNDERSCORE = join(SHIFT40, HYPHEN);
 
 	// SHIFT 56
+	private static final Integer[] ANGLE_QUOTE_OPEN = join(SHIFT56, QUESTION);
+	private static final Integer[] ANGLE_QUOTE_CLOSE = join(SHIFT56, QUESTION_INVERTED);
 	private static final Integer[] BACK_SLASH = join(SHIFT56, N1);
 	private static final Integer[] BULLET = join(SHIFT56, FULLSTOP);
 	private static final Integer[] FORWARD_SLASH = join(SHIFT56, 12);
@@ -1180,33 +1248,47 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer[] Gchi = join(SHIFT40, 47);
 	private static final Integer[] Gpsi = join(SHIFT40, Ay);
 	private static final Integer[] Gomega = join(SHIFT40, Aw);
-	private static final HashMap<Integer[], KeyData[]> GREEK = new HashMap<Integer[], KeyData[]>();
+	private static final HashMap<Integer[], KeyData[][]> GREEK = new HashMap<Integer[], KeyData[][]>();
 	static {
-		GREEK.put(Galpha, new KeyData[] {KD_Galpha, KD_GALPHA});
-		GREEK.put(Gbeta, new KeyData[] {KD_Gbeta, KD_GBETA});
-		GREEK.put(Ggamma, new KeyData[] {KD_Ggamma, KD_GGAMMA});
-		GREEK.put(Gdelta, new KeyData[] {KD_Gdelta, KD_GDELTA});
-		GREEK.put(Gepsilon, new KeyData[] {KD_Gepsilon, KD_GEPSILON});
-		GREEK.put(Gzeta, new KeyData[] {KD_Gzeta, KD_GZETA});
-		GREEK.put(Geta, new KeyData[] {KD_Geta, KD_GETA});
-		GREEK.put(Gtheta, new KeyData[] {KD_Gtheta, KD_GTHETA});
-		GREEK.put(Giota, new KeyData[] {KD_Giota, KD_GIOTA});
-		GREEK.put(Gkappa, new KeyData[] {KD_Gkappa, KD_GKAPPA});
-		GREEK.put(Glambda, new KeyData[] {KD_Glambda, KD_GLAMBDA});
-		GREEK.put(Gmu, new KeyData[] {KD_Gmu, KD_GMU});
-		GREEK.put(Gnu, new KeyData[] {KD_Gnu, KD_GNU});
-		GREEK.put(Gxi, new KeyData[] {KD_Gxi, KD_GXI});
-		GREEK.put(Gomicron, new KeyData[] {KD_Gomicron, KD_GOMICRON});
-		GREEK.put(Gpi, new KeyData[] {KD_Gpi, KD_GPI});
-		GREEK.put(Grho, new KeyData[] {KD_Grho, KD_GRHO});
-		GREEK.put(Gsigma, new KeyData[] {KD_Gsigma, KD_GSIGMA});
-		GREEK.put(Gtau, new KeyData[] {KD_Gtau, KD_GTAU});
-		GREEK.put(Gupsilon, new KeyData[] {KD_Gupsilon, KD_GUPSILON});
-		GREEK.put(Gphi, new KeyData[] {KD_Gphi, KD_GPHI});
-		GREEK.put(Gchi, new KeyData[] {KD_Gchi, KD_GCHI});
-		GREEK.put(Gpsi, new KeyData[] {KD_Gpsi, KD_GPSI});
-		GREEK.put(Gomega, new KeyData[] {KD_Gomega, KD_GOMEGA});
+		GREEK.put(Galpha, link(KD_Galpha, KD_GALPHA));
+		GREEK.put(Gbeta, link(KD_Gbeta, KD_GBETA));
+		GREEK.put(Ggamma, link(KD_Ggamma, KD_GGAMMA));
+		GREEK.put(Gdelta, link(KD_Gdelta, KD_GDELTA));
+		GREEK.put(Gepsilon, link(KD_Gepsilon, KD_GEPSILON));
+		GREEK.put(Gzeta, link(KD_Gzeta, KD_GZETA));
+		GREEK.put(Geta, link(KD_Geta, KD_GETA));
+		GREEK.put(Gtheta, link(KD_Gtheta, KD_GTHETA));
+		GREEK.put(Giota, link(KD_Giota, KD_GIOTA));
+		GREEK.put(Gkappa, link(KD_Gkappa, KD_GKAPPA));
+		GREEK.put(Glambda, link(KD_Glambda, KD_GLAMBDA));
+		GREEK.put(Gmu, link(KD_Gmu, KD_GMU));
+		GREEK.put(Gnu, link(KD_Gnu, KD_GNU));
+		GREEK.put(Gxi, link(KD_Gxi, KD_GXI));
+		GREEK.put(Gomicron, link(KD_Gomicron, KD_GOMICRON));
+		GREEK.put(Gpi, link(KD_Gpi, KD_GPI));
+		GREEK.put(Grho, link(KD_Grho, KD_GRHO));
+		GREEK.put(Gsigma, link(KD_Gsigma, KD_GSIGMA));
+		GREEK.put(Gtau, link(KD_Gtau, KD_GTAU));
+		GREEK.put(Gupsilon, link(KD_Gupsilon, KD_GUPSILON));
+		GREEK.put(Gphi, link(KD_Gphi, KD_GPHI));
+		GREEK.put(Gchi, link(KD_Gchi, KD_GCHI));
+		GREEK.put(Gpsi, link(KD_Gpsi, KD_GPSI));
+		GREEK.put(Gomega, link(KD_Gomega, KD_GOMEGA));
 	}
+
+	private static final String[] DEFAULT_STANDALONES = {
+		"default" /*name*/, "" /*"" if same for lower and upper case*/,
+		"", "but", "can", "do", "every", "from", "go", "have", "", "just", "knowledge", "like", "more",
+		"not", "", "people", "quite", "rather", "so", "that", "us", "very", "will", "it", "you", "as"
+	};
+
+	private static final String[] JAVA_STANDALONES = {
+		"java", "U",
+		"new", "boolean", "char", "double", "enum", "float", "switch", "case", "int", "", "break", "class", "",
+		"null", "for", "private", "", "return", "static", "this", "public", "void", "while", "if", "else", "final",
+		"ArrayList", "Boolean", "Character", "Double", "", "Float", "Logger", "HashMap", "Integer", "", "", "List", "",
+		"", "@Override", "", "", "Arrays", "String", "T", "", "", "", "", "System", ""
+	};
 
 	private static final HashMap<Integer, MapData> BRAILLE_MAP = new HashMap<Integer, MapData>();
 	static {
