@@ -8,6 +8,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.logging.Logger;
 import javax.swing.JTextArea;
 
@@ -21,6 +22,7 @@ class MapData {
 	public static final int ALPHABET = 32;
 	public static final int STRING = 64;
 	public static final int STANDALONE = 128;
+	public static final int SUBSTITUTION = 256;
 	public static final int FINAL = 120;
 	public static final int CONCRETE = 126;
 
@@ -41,7 +43,7 @@ class MapData {
 
 	// Can't use List.of as arguments could be null.
 	private static ArrayList<ArrayList<KeyData>> listOf(ArrayList<KeyData> kdLower, ArrayList<KeyData> kdUpper) {
-		ArrayList<ArrayList<KeyData>> result = new ArrayList<ArrayList<KeyData>>();
+		ArrayList<ArrayList<KeyData>> result = new ArrayList<ArrayList<KeyData>>(2);
 		result.add(kdLower);
 		result.add(kdUpper);
 		return result;
@@ -93,6 +95,8 @@ class MapData {
 	public boolean isOverflow() {return (type & OVERFLOWS) > 0;}
 	public boolean isWhitespace() {return (type & WHITESPACE) > 0;}
 	public boolean isStandAloneMarker() {return (type & STANDALONE) > 0;}
+	public boolean isExpandable() {return (isAlphabet() && !isCharacter() && !isString());}
+	public boolean isSubstitution() {return (type & SUBSTITUTION) > 0;}
 }
 
 class KeyData {
@@ -131,11 +135,15 @@ class History {
 	ArrayList<Integer> pinCodeList;
 	MapData mapData;
 	ArrayList<KeyData> keyData;
+	boolean shift;
+	boolean grade1;
 
-	History(ArrayList<Integer> pcl, MapData md, ArrayList<KeyData> kd) {
+	History(ArrayList<Integer> pcl, MapData md, ArrayList<KeyData> kd, boolean sh, boolean g1) {
 		this.pinCodeList = new ArrayList<Integer>(pcl);
 		this.mapData = md;
 		this.keyData = kd;
+		this.shift = sh;
+		this.grade1 = g1;
 	}
 }
 
@@ -161,6 +169,7 @@ public class TextAreaBraille extends JTextArea {
 	private ArrayList<Integer> currentPinCodesList = new ArrayList<Integer>();
     private boolean lastKeyDown = false;
 	private ArrayDeque<History> recentHistory = new ArrayDeque<History>(2);
+	private String currentWordContractions = "default";
 	private int wordLength = 0;
 	private LOCK grade1 = LOCK.OFF;
 	private LOCK shift = LOCK.OFF;
@@ -170,8 +179,8 @@ public class TextAreaBraille extends JTextArea {
     TextAreaBraille() {
         super();
 		// Initialise as if we've just had whitespace, arbitrarily ENTER.
-		recentHistory.add(new History(new ArrayList<Integer>(Arrays.asList(ENTER)), BRAILLE_MAP.get(ENTER), BRAILLE_MAP.get(ENTER).getKeyData()));
-		recentHistory.add(new History(new ArrayList<Integer>(Arrays.asList(ENTER)), BRAILLE_MAP.get(ENTER), BRAILLE_MAP.get(ENTER).getKeyData()));
+		recentHistory.add(new History(new ArrayList<Integer>(Arrays.asList(ENTER)), BRAILLE_MAP.get(ENTER), BRAILLE_MAP.get(ENTER).getKeyData(), false, false));
+		recentHistory.add(new History(new ArrayList<Integer>(Arrays.asList(ENTER)), BRAILLE_MAP.get(ENTER), BRAILLE_MAP.get(ENTER).getKeyData(), false, false));
     }
 
 
@@ -247,13 +256,11 @@ public class TextAreaBraille extends JTextArea {
 					shift = shift.next();
 					// Doesn't reset other shifts
 					digit = digit.reset();
-					currentPinCode = 0;
 					log.info("SHIFT: " + shift);
 				} else if (currentPinCode == SHIFT40) {
 					shift40 = shift40.next();
 					// Doesn't reset other shifts
 					digit = digit.reset();
-					currentPinCode = ~(~currentPinCode | pin);
 					log.info("SHIFT40: " + shift40);
 					popQualifiers();
 					qualifyPinCode();
@@ -262,11 +269,11 @@ public class TextAreaBraille extends JTextArea {
 					// Resets both shifts.
 					shift = shift.reset();
 					shift40 = shift40.reset();
-					currentPinCode = ~(~currentPinCode | pin);
 					log.info("DIGIT: " + digit);
 					popQualifiers();
 					qualifyPinCode();
 				}
+				currentPinCode = ~(~currentPinCode | pin);
 
 				lastKeyDown = false;
 				return;
@@ -279,7 +286,7 @@ public class TextAreaBraille extends JTextArea {
 			if (isWhitespace(currentPinCode)) popQualifiers();
 			currentPinCodesList.add(currentPinCode);
 			log.info("PIN CODE SEQUENCE: " + currentPinCodesList.toString());
-			MapData md = parsePinCodes();
+			MapData md = parsePinCodes(e);
 			if (md == null) {
 				int originalPinCodesListLength = currentPinCodesList.size();
 				// This should only ever recurse once.
@@ -366,7 +373,7 @@ public class TextAreaBraille extends JTextArea {
 
 	private void updateRecentHistory(MapData md, ArrayList<KeyData> kd) {
 		recentHistory.removeFirst();
-		recentHistory.addLast(new History(currentPinCodesList, md, kd));
+		recentHistory.addLast(new History(currentPinCodesList, md, kd, shift.isOn(), grade1.isOn()));
 	}
 
 	private void popQualifiers() {
@@ -409,7 +416,7 @@ public class TextAreaBraille extends JTextArea {
 		return md.map.get(pinCode);
 	}
 
-	private MapData parsePinCodes() {
+	private MapData parsePinCodes(KeyEvent e) {
 		int pinCodeCount = currentPinCodesList.size();
 		// I really want to pass and update this in a couple of helper functions.
 		// For such limited use this is probably the most efficient way, if a little ugly.
@@ -434,7 +441,7 @@ public class TextAreaBraille extends JTextArea {
 						currentPinCodesList.clear();
 						qualifyPinCode();
 						currentPinCodesList.add(finalPinCode);
-						return parsePinCodes();
+						return parsePinCodes(e);
 					}
 				}
 				if (md.isAlphabet()) {
@@ -483,9 +490,33 @@ public class TextAreaBraille extends JTextArea {
 						}
 					}
 					return result;
-				} else { // WHITESPACE, CHARACTER, STRING, none of which can't be modified.
-					return md;
 				}
+
+				if (md.isStandAloneMarker() &&
+					recentHistory.getFirst().mapData.isStandAloneMarker() &&
+					recentHistory.getLast().mapData.isExpandable() &&
+					!recentHistory.getLast().grade1 &&
+					!grade1.isOn()) {
+					MapData result = md;
+					// Should be a single pin code.
+					Integer prevPinCode = recentHistory.getLast().pinCodeList.get(0);
+					MapData asMapData = ALPHABET_STANDALONES.get(currentWordContractions).get(prevPinCode);
+					if (!asMapData.isSubstitution()) {
+						result = new MapData(MapData.STRING, asMapData.keyData.get((shift.isOn()) ? UPPER : LOWER), null);
+					} else {
+						if (recentHistory.getLast().shift == shift.isOn()) {
+							result = new MapData(MapData.STRING, asMapData.keyData.get((shift.isOn()) ? UPPER : LOWER), null);
+						} else if (shift.isOn()) {
+							result = new MapData(MapData.STRING, asMapData.keyData.get(LOWER_WITH_UPPER), null);
+						} else {
+							result = new MapData(MapData.STRING, asMapData.keyData.get(UPPER_WITH_LOWER), null);
+						}
+					}
+					if (result.keyData.get(0) != null) {
+						this.sendKeyEvents(e.getComponent(), e.getWhen(), result.keyData.get(0));
+					}
+				} // else // CHARACTER, STRING, none of which can't be modified.
+				return md;
 			}
 			if (md.isModifier()) mdModifier = md;
 			if (md.isLigature()) {mdLigature = md;}
@@ -694,6 +725,106 @@ public class TextAreaBraille extends JTextArea {
 	}
 
 
+	private static void populateAlphabetStandAlones() {
+		// Need atemporary map.
+		Integer[] pinCodes = new Integer[26];
+		pinCodes = ALPHABET.keySet().toArray(pinCodes); // from LinkedHashMap, so ordered.
+		HashMap<Character, KeyData> charToKeyData = new HashMap<Character, KeyData>();
+		for (Integer code: pinCodes) {
+			charToKeyData.put(ALPHABET.get(code)[LOWER][0].keyChar, ALPHABET.get(code)[LOWER][0]);
+			charToKeyData.put(ALPHABET.get(code)[UPPER][0].keyChar, ALPHABET.get(code)[UPPER][0]);
+		}
+		charToKeyData.put('@', KD_AT_SIGN);
+
+		for (String[] subs: STANDALONES) {
+			// Is the upper case a reflection of the lower, or independent?
+			boolean upperFromLower = (subs[1] == "") ? true : false;
+			int mdType = 0;
+			if (upperFromLower) {
+				mdType = MapData.STRING | MapData.ALPHABET;
+			} else {
+				mdType = MapData.STRING | MapData.CHARACTER;
+			}
+			// For each letter in the alphabet.
+			HashMap<Integer, MapData> dict = new HashMap<Integer, MapData>();
+			// The difficult situation is when lower and upper are equivalent, but the first letter
+			// does not match the contraction letter. There we have to backspace and the case of the
+			// first letter may not match the case of the rest of the word. IN other cases, the first letter
+			// remains unaltered, so there is no complication.
+			for (int i = 0; i < 26; i++) {
+				ArrayList<KeyData> lower = null;
+				ArrayList<KeyData> upper = null;
+				// Used in the case when SUBSTITUTTION is set.
+				ArrayList<KeyData> lowerWithUpper = null;
+				ArrayList<KeyData> upperWithLower = null;
+				// If there is a lower case contraction.
+				if (subs[i+2] != "") {
+					lower = new ArrayList<KeyData>();
+					if (upperFromLower) upper = new ArrayList<KeyData>();
+					String sub = subs[i+2];
+					char keyChar = ALPHABET.get(pinCodes[i])[LOWER][0].keyChar;
+					// Is the contraction's trigger letter the same as the first letter of the word itself? (eg: x = it)
+					// Want to do as much work here as possible, rather than when typing.
+					if (sub.charAt(0) != keyChar) {
+						if (!upperFromLower) {
+							// The easy case.
+							lower.add(KD_BACKSPACE);
+							lower.add(charToKeyData.get(sub.charAt(0)));
+						} else {
+							mdType = mdType | MapData.SUBSTITUTION;
+							lower.add(KD_BACKSPACE);
+							lower.add(charToKeyData.get(sub.charAt(0)));
+							upper.add(KD_BACKSPACE);
+							upper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(0))));
+							lowerWithUpper = new ArrayList<KeyData>();
+							lowerWithUpper.add(KD_BACKSPACE);
+							lowerWithUpper.add(charToKeyData.get(sub.charAt(0)));
+							upperWithLower = new ArrayList<KeyData>();
+							upperWithLower.add(KD_BACKSPACE);
+							upperWithLower.add(charToKeyData.get(Character.toUpperCase(sub.charAt(0))));
+						}
+					}
+					// Add the rest of the word.
+					for (int c = 1; c < sub.length(); c++) {
+						lower.add(charToKeyData.get(sub.charAt(c)));
+						if (upperFromLower) {
+							upper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(c))));
+							if (sub.charAt(0) != keyChar) {
+								lowerWithUpper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(c))));
+								upperWithLower.add(charToKeyData.get(sub.charAt(c)));
+							}
+						}
+					}
+				}
+				if (!upperFromLower && subs[i+28] != "") {
+					upper = new ArrayList<KeyData>();
+					String sub = subs[i+28];
+					char keyChar = ALPHABET.get(pinCodes[i])[UPPER][0].keyChar;
+					// Is the contraction's trigger letter the same as the first letter of the word itself? (eg: x = it)
+					if (sub.charAt(0) != keyChar) {
+						log.info("CHARS: " + sub.charAt(0) + ", " + keyChar);
+						upper.add(KD_BACKSPACE);
+						upper.add(charToKeyData.get(sub.charAt(0)));	
+					}
+					// Add the rest of the word.
+					for (int c = 1; c < sub.length(); c++) {
+						upper.add(charToKeyData.get(sub.charAt(c)));
+					}
+				}
+				MapData pair = new MapData(mdType, lower, upper);
+				if (lowerWithUpper != null) {
+					pair.keyData.add(lowerWithUpper);
+					pair.keyData.add(upperWithLower);
+				}
+
+				dict.put(pinCodes[i], pair);
+			}
+
+			ALPHABET_STANDALONES.put(subs[0], dict);
+		}
+	}
+
+
     private static void populateBrailleMap() {
 		// ENGLISH ALPHABET
 		addAlphabetsToBrailleMap();
@@ -778,22 +909,22 @@ public class TextAreaBraille extends JTextArea {
 		addCharToBrailleMap(YEN, new KeyData('¥'));
 
 		// MATHS
-		addStandAloneToBrailleMap(ASTERISK, KD_ASTERISK);
-		addStandAloneToBrailleMap(DITTO, new KeyData('"', true));
-		addStandAloneToBrailleMap(DIVIDE, new KeyData('÷'));
-		addStandAloneToBrailleMap(EQUALS, KD_EQUALS);
-		addStandAloneToBrailleMap(MINUS, KD_MINUS);
-		addStandAloneToBrailleMap(MULTIPLY, new KeyData('×'));
-		addStandAloneToBrailleMap(PERCENT, new KeyData('\u0025', 37));
-		addStandAloneToBrailleMap(PLUS, KD_PLUS);
+		addCharToBrailleMap(ASTERISK, KD_ASTERISK);
+		addCharToBrailleMap(DITTO, new KeyData('"', true));
+		addCharToBrailleMap(DIVIDE, new KeyData('÷'));
+		addCharToBrailleMap(EQUALS, KD_EQUALS);
+		addCharToBrailleMap(MINUS, KD_MINUS);
+		addCharToBrailleMap(MULTIPLY, new KeyData('×'));
+		addCharToBrailleMap(PERCENT, new KeyData('\u0025', 37));
+		addCharToBrailleMap(PLUS, KD_PLUS);
 	
 		// SYMBOLS
-		addStandAloneToBrailleMap(AMPERSAND, new KeyData('&', true));
-		addStandAloneToBrailleMap(AT_SIGN, new KeyData('@', true));
+		addCharToBrailleMap(AMPERSAND, new KeyData('&', true));
+		addCharToBrailleMap(AT_SIGN, KD_AT_SIGN);
 		addStandAloneToBrailleMap(COPYRIGHT, new KeyData('©'));
 		addStandAloneToBrailleMap(DAGGER, new KeyData('†'));
 		addStandAloneToBrailleMap(DOUBLE_DAGGER, new KeyData('‡'));
-		addStandAloneToBrailleMap(DEGREES, new KeyData('°'));
+		addCharToBrailleMap(DEGREES, new KeyData('°'));
 		addCharToBrailleMap(FEMALE, new KeyData('♀'));
 		addCharToBrailleMap(MALE, new KeyData('♂'));
 		addStandAloneToBrailleMap(PARAGRAPH, new KeyData('¶'));
@@ -953,6 +1084,7 @@ public class TextAreaBraille extends JTextArea {
 	private static final KeyData KD_GOMEGA = new KeyData('Ω');
 
 	// PUNCTUATION
+	private static final KeyData KD_AT_SIGN = new KeyData('@', true);
 	private static final KeyData KD_COMMA = new KeyData(',', KeyEvent.VK_COMMA);
 	private static final KeyData KD_FULLSTOP = new KeyData('.', KeyEvent.VK_PERIOD);
 	private static final KeyData KD_PLUS = new KeyData('+', KeyEvent.VK_PLUS);
@@ -1042,7 +1174,7 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer Ax = 45;
 	private static final Integer Ay = 61;
 	private static final Integer Az = 53;
-	private static final HashMap<Integer, KeyData[][]> ALPHABET = new HashMap<Integer, KeyData[][]>();
+	private static final LinkedHashMap<Integer, KeyData[][]> ALPHABET = new LinkedHashMap<Integer, KeyData[][]>();
 	static {
 		ALPHABET.put(Aa, link(KD_Aa, KD_AA));
 		ALPHABET.put(Ab, link(KD_Ab, KD_AB));
@@ -1073,6 +1205,8 @@ public class TextAreaBraille extends JTextArea {
 	}
 	private static final int LOWER = 0;
 	private static final int UPPER = 1;
+	private static final int LOWER_WITH_UPPER = 2;
+	private static final int UPPER_WITH_LOWER = 3;
 	private static final int LEFT = 0;
 	private static final int RIGHT = 1;
 
@@ -1276,10 +1410,21 @@ public class TextAreaBraille extends JTextArea {
 		GREEK.put(Gomega, link(KD_Gomega, KD_GOMEGA));
 	}
 
+	private static final HashMap<String, HashMap<Integer, MapData>> ALPHABET_STANDALONES =
+		new HashMap<String, HashMap<Integer, MapData>>();
+
 	private static final String[] DEFAULT_STANDALONES = {
 		"default" /*name*/, "" /*"" if same for lower and upper case*/,
 		"", "but", "can", "do", "every", "from", "go", "have", "", "just", "knowledge", "like", "more",
 		"not", "", "people", "quite", "rather", "so", "that", "us", "very", "will", "it", "you", "as"
+	};
+
+	private static final String[] GENEALOGY_STANDALONES = {
+		"genealogy", "U", 
+		"baptised", "born", "census", "died", "e", "f", "g", "h", "i", "j", "k", "letter", "m",
+		"n", "o", "proved", "q", "r", "s", "t", "buried", "v", "will", "x", "y", "z",
+		"Baptism", "Birth", "Census", "Death", "E", "F", "G", "H", "I", "J", "K", "Letter", "M",
+		"N", "O", "Probate", "Q", "R", "S", "T", "Burial", "V", "Will", "X", "Y", "Z"
 	};
 
 	private static final String[] JAVA_STANDALONES = {
@@ -1290,8 +1435,11 @@ public class TextAreaBraille extends JTextArea {
 		"", "@Override", "", "", "Arrays", "String", "T", "", "", "", "", "System", ""
 	};
 
+	private static final String[][] STANDALONES = {DEFAULT_STANDALONES};
+
 	private static final HashMap<Integer, MapData> BRAILLE_MAP = new HashMap<Integer, MapData>();
 	static {
 		populateBrailleMap();
+		populateAlphabetStandAlones();
 	}
 }
