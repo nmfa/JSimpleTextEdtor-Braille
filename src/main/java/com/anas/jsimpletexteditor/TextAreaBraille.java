@@ -1271,6 +1271,13 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer GG = 54;
 	private static final Integer IN = 20;
 
+	// STRONG CONTRACTIONS
+	private static final Integer AND = 47;
+	private static final Integer FOR = 63;
+	private static final Integer OF = 55;
+	private static final Integer THE = 46;
+	private static final Integer WITH = 62;
+
 	private static final HashMap<Integer, String> GROUPSIGNS = new HashMap<Integer, String>();
 	static {
 		GROUPSIGNS.put(CH, "ch");
@@ -1288,6 +1295,12 @@ public class TextAreaBraille extends JTextArea {
 		GROUPSIGNS.put(EN, "en");
 		GROUPSIGNS.put(GG, "gg");
 		GROUPSIGNS.put(IN, "in");
+		// Actually contractions, but treat the same.
+		GROUPSIGNS.put(AND, "and");
+		GROUPSIGNS.put(FOR, "for");
+		GROUPSIGNS.put(OF, "of");
+		GROUPSIGNS.put(THE, "the");
+		GROUPSIGNS.put(WITH, "with");
 	}
 
 	// STRONG WORDSIGNS
@@ -1305,13 +1318,6 @@ public class TextAreaBraille extends JTextArea {
 //	private static final Integer HIS = QUESTION_MARK;
 //	private static final Integer IN = IN;
 	private static final Integer WAS = 52;
-
-	// STRONG CONTRACTIONS
-	private static final Integer AND = 47;
-	private static final Integer FOR = 63;
-	private static final Integer OF = 55;
-	private static final Integer THE = 46;
-	private static final Integer WITH = 62;
 
 	// SIMPLE PUNCTUATION
 	private static final Integer APOSTROPHE = 4;
