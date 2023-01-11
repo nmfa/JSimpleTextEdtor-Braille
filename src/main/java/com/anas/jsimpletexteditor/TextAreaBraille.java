@@ -447,19 +447,22 @@ public class TextAreaBraille extends JTextArea {
 						return parsePinCodes(e);
 					}
 				}
+
+				if (md.isString()) {
+					MapData result = md;
+					if (shift.isOff()) {
+						result = new MapData(md.type, md.keyData.get(LOWER), null);
+					} else if (shift.isSymbol()) {
+						result = new MapData(md.type, md.keyData.get(UPPER_WITH_LOWER), null);
+					} else {
+						result = new MapData(md.type, md.keyData.get(UPPER), null);
+					}
+					return result;
+				}
+
 				if (md.isAlphabet()) {
 					MapData result = md;
 					// Can't also be modified, ligatured or a standalone marker.
-					if (md.isString()) {
-						if (shift.isOff()) {
-							result = new MapData(MapData.STRING, md.keyData.get(LOWER), null);
-						} else if (shift.isSymbol()) {
-							result = new MapData(MapData.STRING, md.keyData.get(UPPER_WITH_LOWER), null);
-						} else {
-							result = new MapData(MapData.STRING, md.keyData.get(UPPER), null);
-						}
-						return result;
-					}
 
 					// Apply any modifier
 					if (mdModifier != null) {
@@ -516,19 +519,22 @@ public class TextAreaBraille extends JTextArea {
 					// Should be a single pin code.
 					Integer prevPinCode = recentHistory.getLast().pinCodeList.get(0);
 					MapData asMapData = ALPHABETIC_WORDSIGNS.get(currentWordContractions).get(prevPinCode);
-					if (!asMapData.isSubstitution()) {
-						result = new MapData(MapData.STRING, asMapData.keyData.get((shift.isOn()) ? UPPER : LOWER), null);
-					} else {
-						if (recentHistory.getLast().shift == shift.isOn()) {
+					// Ensure a contraction is defined.
+					if (asMapData != null) { 
+						if (!asMapData.isSubstitution()) {
 							result = new MapData(MapData.STRING, asMapData.keyData.get((shift.isOn()) ? UPPER : LOWER), null);
-						} else if (shift.isOn()) {
-							result = new MapData(MapData.STRING, asMapData.keyData.get(LOWER_WITH_UPPER), null);
 						} else {
-							result = new MapData(MapData.STRING, asMapData.keyData.get(UPPER_WITH_LOWER), null);
+							if (recentHistory.getLast().shift == shift.isOn()) {
+								result = new MapData(MapData.STRING, asMapData.keyData.get((shift.isOn()) ? UPPER : LOWER), null);
+							} else if (shift.isOn()) {
+								result = new MapData(MapData.STRING, asMapData.keyData.get(LOWER_WITH_UPPER), null);
+							} else {
+								result = new MapData(MapData.STRING, asMapData.keyData.get(UPPER_WITH_LOWER), null);
+							}
 						}
-					}
-					if (result.keyData.get(0) != null) {
-						this.sendKeyEvents(e.getComponent(), e.getWhen(), result.keyData.get(0));
+						if (result.keyData.get(0) != null) {
+							this.sendKeyEvents(e.getComponent(), e.getWhen(), result.keyData.get(0));
+						}
 					}
 				} // else // CHARACTER, STRING, none of which can't be modified.
 				return md;
@@ -626,6 +632,11 @@ public class TextAreaBraille extends JTextArea {
 		addCharToBrailleMap(pinCodes, keyData);
 	}
 
+	private static void addStandAlonesToBrailleMap() {
+		for (Integer[] code: STANDALONES.keySet()) {
+			addStandAloneToBrailleMap(code, STANDALONES.get(code));
+		}
+	}
 	private static void addStandAloneToBrailleMap(Integer[] pinCodes, KeyData... keyData) {
 		addToBrailleMap(pinCodes, MapData.CHARACTER | MapData.STANDALONE, keyData, null);
 	}
@@ -767,7 +778,6 @@ public class TextAreaBraille extends JTextArea {
 			// does not match the contraction letter. There we have to backspace and the case of the
 			// first letter may not match the case of the rest of the word. IN other cases, the first letter
 			// remains unaltered, so there is no complication.
-			//for (int i = 0; i < 26; i++) {
 			for (Integer code: ALPHABET.keySet()) {
 				ArrayList<KeyData> lower = null;
 				ArrayList<KeyData> upper = null;
@@ -777,7 +787,6 @@ public class TextAreaBraille extends JTextArea {
 				// If there is a lower case contraction.
 				char cLower = ALPHABET.get(code)[LOWER][0].keyChar;
 				String aLower = String.valueOf(cLower);
-				//if (subs[i+2] != "") {
 				if (signs.get(aLower) != null) {
 					lower = new ArrayList<KeyData>();
 					if (upperFromLower) upper = new ArrayList<KeyData>();
@@ -840,47 +849,142 @@ public class TextAreaBraille extends JTextArea {
 			}
 
 			ALPHABETIC_WORDSIGNS.put(signs.get("name"), dict);
+		}
 
-			// GROUPSIGNS
-			// As there's no way of implementing a shift mid-sign, LOWER_WITH_UPPER is impossible.
-			for (Integer code: GROUPSIGNS.keySet()) {
-				MapData triplet = new MapData(MapData.STRING | MapData.ALPHABET, new ArrayList<ArrayList<KeyData>>());
-				for (int i = 0; i < 3; i++) triplet.keyData.add(new ArrayList<KeyData>());
-				String groupSign = GROUPSIGNS.get(code);
-				for (int c = 0; c < groupSign.length(); c++) {
-					char cLower = groupSign.charAt(c);
-					char cUpper = Character.toUpperCase(cLower);
-					triplet.keyData.get(LOWER).add(charToKeyData.get(cLower));
-					triplet.keyData.get(UPPER).add(charToKeyData.get(cUpper));
-					if (c == 0) {
-						triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cUpper));
-					} else {
-						triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cLower));
-					}
+		// GROUPSIGNS
+		// As there's no way of implementing a shift mid-sign, LOWER_WITH_UPPER is impossible.
+		for (Integer code: GROUPSIGNS.keySet()) {
+			MapData triplet = new MapData(MapData.STRING | MapData.ALPHABET, new ArrayList<ArrayList<KeyData>>());
+			for (int i = 0; i < 3; i++) triplet.keyData.add(new ArrayList<KeyData>());
+			String groupSign = GROUPSIGNS.get(code);
+			for (int c = 0; c < groupSign.length(); c++) {
+				char cLower = groupSign.charAt(c);
+				char cUpper = Character.toUpperCase(cLower);
+				triplet.keyData.get(LOWER).add(charToKeyData.get(cLower));
+				triplet.keyData.get(UPPER).add(charToKeyData.get(cUpper));
+				if (c == 0) {
+					triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cUpper));
+				} else {
+					triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cLower));
 				}
-				BRAILLE_MAP.put(code, triplet);
 			}
+			BRAILLE_MAP.put(code, triplet);
+		}
 		
-			// WORDSIGNS
-			// As there's no way of implementing a shift mid-sign, LOWER_WITH_UPPER is impossible.
+		// WORDSIGNS
+		// As there's no way of implementing a shift mid-sign, LOWER_WITH_UPPER is impossible.
+		for (Integer code: WORDSIGNS.keySet()) {
+			MapData triplet = new MapData(MapData.STRING | MapData.ALPHABET | MapData.WORDSIGN, new ArrayList<ArrayList<KeyData>>());
+			for (int i = 0; i < 3; i++) triplet.keyData.add(new ArrayList<KeyData>());
+			String groupSign = WORDSIGNS.get(code);
+			for (int c = 0; c < groupSign.length(); c++) {
+				char cLower = groupSign.charAt(c);
+				char cUpper = Character.toUpperCase(cLower);
+				triplet.keyData.get(LOWER).add(charToKeyData.get(cLower));
+				triplet.keyData.get(UPPER).add(charToKeyData.get(cUpper));
+				if (c == 0) {
+					triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cUpper));
+				} else {
+					triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cLower));
+				}
+			}
+			BRAILLE_MAP.put(code, triplet);
+		}
+
+		for (HashMap<String, String> signs: WORDSIGN_DICTIONARIES) {
+			// Is the upper case a reflection of the lower, or independent?
+			boolean upperFromLower = (signs.get("upperFromLower") == "true") ? true : false;
+			int mdType = 0;
+			if (upperFromLower) {
+				mdType = MapData.STRING | MapData.ALPHABET;
+			} else {
+				mdType = MapData.STRING | MapData.CHARACTER;
+			}
+			HashMap<Integer, MapData> dict = ALPHABETIC_WORDSIGNS.get(signs.get("name"));
+			// For each symbolic wordsign for contractions
+			// The difficult situation is when lower and upper are equivalent, but the first letter
+			// does not match the contraction letter. There we have to backspace and the case of the
+			// first letter may not match the case of the rest of the word. IN other cases, the first letter
+			// remains unaltered, so there is no complication.
 			for (Integer code: WORDSIGNS.keySet()) {
-				MapData triplet = new MapData(MapData.STRING | MapData.ALPHABET | MapData.WORDSIGN, new ArrayList<ArrayList<KeyData>>());
-				for (int i = 0; i < 3; i++) triplet.keyData.add(new ArrayList<KeyData>());
-				String groupSign = WORDSIGNS.get(code);
-				for (int c = 0; c < groupSign.length(); c++) {
-					char cLower = groupSign.charAt(c);
-					char cUpper = Character.toUpperCase(cLower);
-					triplet.keyData.get(LOWER).add(charToKeyData.get(cLower));
-					triplet.keyData.get(UPPER).add(charToKeyData.get(cUpper));
-					if (c == 0) {
-						triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cUpper));
-					} else {
-						triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cLower));
+				ArrayList<KeyData> lower = null;
+				ArrayList<KeyData> upper = null;
+				// Used in the case when SUBSTITUTTION is set.
+				ArrayList<KeyData> upperWithLower = null;
+				ArrayList<KeyData> lowerWithUpper = null;
+				// If there is a lower case contraction.
+				String sLower = WORDSIGNS.get(code);
+				if (signs.get(sLower) != null) {
+					lower = new ArrayList<KeyData>();
+					if (upperFromLower) upper = new ArrayList<KeyData>();
+					String sub = signs.get(sLower);
+					// Is the contraction's trigger letter the same as the first letter of the word itself? (eg: x = it)
+					// Want to do as much work here as possible, rather than when typing.
+					if (sub.substring(0, 2) != sLower) {
+						if (!upperFromLower) {
+							// The easy case.
+							lower.add(KD_BACKSPACE);
+							lower.add(KD_BACKSPACE);
+							lower.add(charToKeyData.get(sub.charAt(0)));
+							lower.add(charToKeyData.get(sub.charAt(1)));
+						} else {
+							mdType = mdType | MapData.SUBSTITUTION;
+							lower.add(KD_BACKSPACE);
+							lower.add(KD_BACKSPACE);
+							lower.add(charToKeyData.get(sub.charAt(0)));
+							lower.add(charToKeyData.get(sub.charAt(1)));
+							upper.add(KD_BACKSPACE);
+							upper.add(KD_BACKSPACE);
+							upper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(0))));
+							upper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(1))));
+							upperWithLower = new ArrayList<KeyData>();
+							upperWithLower.add(KD_BACKSPACE);
+							upperWithLower.add(KD_BACKSPACE);
+							upperWithLower.add(charToKeyData.get(Character.toUpperCase(sub.charAt(0))));
+							upperWithLower.add(charToKeyData.get(sub.charAt(1)));
+							lowerWithUpper = new ArrayList<KeyData>();
+							lowerWithUpper.add(KD_BACKSPACE);
+							lowerWithUpper.add(KD_BACKSPACE);
+							lowerWithUpper.add(charToKeyData.get(sub.charAt(0)));
+							lowerWithUpper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(1))));
+						}
+					}
+					// Add the rest of the word.
+					for (int c = 2; c < sub.length(); c++) {
+						lower.add(charToKeyData.get(sub.charAt(c)));
+						if (upperFromLower) {
+							upper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(c))));
+							if (sub.substring(0, 2) != sLower) {
+								upperWithLower.add(charToKeyData.get(sub.charAt(c)));
+								lowerWithUpper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(c))));
+							}
+						}
 					}
 				}
-				BRAILLE_MAP.put(code, triplet);
-			}
+				String sUpper = sLower.toUpperCase();
+				if (!upperFromLower && signs.get(sUpper) != null) {
+					upper = new ArrayList<KeyData>();
+					String sub = signs.get(sUpper);
+					// Is the contraction's trigger letter the same as the first letter of the word itself? (eg: x = it)
+					if (sub.substring(0, 2) != sUpper) {
+						upper.add(KD_BACKSPACE);
+						upper.add(KD_BACKSPACE);
+						upper.add(charToKeyData.get(sub.charAt(0)));
+						upper.add(charToKeyData.get(sub.charAt(1)));
+					}
+					// Add the rest of the word.
+					for (int c = 1; c < sub.length(); c++) {
+						upper.add(charToKeyData.get(sub.charAt(c)));
+					}
+				}
+				MapData pair = new MapData(mdType, lower, upper);
+				if (lowerWithUpper != null) {
+					pair.keyData.add(upperWithLower);
+					pair.keyData.add(lowerWithUpper);
+				}
 
+				dict.put(code, pair);
+			}
 		}
 	}
 
@@ -898,10 +1002,8 @@ public class TextAreaBraille extends JTextArea {
 		addWhitespaceToBrailleMap(SPACE, KD_SPACE);
  	
 		// NUMBERS
-		// COMPUTER NOTATION
 		addToBrailleMap(join(DIGIT, SHIFT16), MapData.CHARACTER | MapData.OVERFLOWS | MapData.STANDALONE, KD_SPACE, null);
 		for (int i = 0; i < 10; i++) {
-//			addCharToBrailleMap(N_TEN[i], KD_TEN[i]);
 			addCharToBrailleMap(join(DIGIT, D_TEN[i]), KD_TEN[i]);
 			addCharToBrailleMap(join(DIGIT, SHIFT16, D_TEN[i]),  KD_TEN[i]);
 		}
@@ -926,11 +1028,9 @@ public class TextAreaBraille extends JTextArea {
 		// SIMPLE PUNCTUATION
 		addStandAloneToBrailleMap(ANGLE_QUOTE_OPEN, new KeyData('«'));
 		addStandAloneToBrailleMap(ANGLE_QUOTE_CLOSE, new KeyData('»'));
-		addStandAloneToBrailleMap(APOSTROPHE, new KeyData('\''));
 		addStandAloneToBrailleMap(BACK_SLASH, KD_BACK_SLASH);
 		addStandAloneToBrailleMap(BULLET, new KeyData('•'));
 		addStandAloneToBrailleMap(CARET, new KeyData('^', true));
-		addStandAloneToBrailleMap(COLON, KD_COLON);
 		addStandAloneToBrailleMap(COMMA, KD_COMMA);
 		addStandAloneToBrailleMap(EXCLAMATION, new KeyData('!', KeyEvent.VK_EXCLAMATION_MARK, true));
 		addStandAloneToBrailleMap(FORWARD_SLASH, KD_FORWARD_SLASH);
@@ -1295,6 +1395,7 @@ public class TextAreaBraille extends JTextArea {
 //	private static final Integer FF = EXCLAMATION;
 	private static final Integer GG = 54;
 	private static final Integer IN = 20;
+	private static final Integer WAS = 52;
 
 	// STRONG CONTRACTIONS
 	private static final Integer AND = 47;
@@ -1305,6 +1406,7 @@ public class TextAreaBraille extends JTextArea {
 
 	private static final HashMap<Integer, String> GROUPSIGNS = new HashMap<Integer, String>();
 	static {
+		// Those not here are used for wordsigns.
 		GROUPSIGNS.put(GH, "gh");
 		GROUPSIGNS.put(ED, "ed");
 		GROUPSIGNS.put(ER, "er");
@@ -1318,7 +1420,7 @@ public class TextAreaBraille extends JTextArea {
 		GROUPSIGNS.put(THE, "the");
 		GROUPSIGNS.put(WITH, "with");
 	}
-
+/*
 	// STRONG WORDSIGNS
 	private static final Integer CHILD = CH;
 	private static final Integer SHALL = SH;
@@ -1334,7 +1436,7 @@ public class TextAreaBraille extends JTextArea {
 //	private static final Integer HIS = QUESTION_MARK;
 //	private static final Integer IN = IN;
 	private static final Integer WAS = 52;
-
+*/
 	private static final HashMap<Integer, String> WORDSIGNS = new HashMap<Integer, String>();
 	static {
 		WORDSIGNS.put(CH, "ch");
@@ -1360,6 +1462,11 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer QUESTION_MARK = 38;
 //	private static final Integer QUESTION_MARK_INVERTED = WAS;
 	private static final Integer SEMICOLON = 6;
+	private static final HashMap<Integer[], KeyData> STANDALONES = new HashMap<Integer[], KeyData>();
+	static {
+		STANDALONES.put(join(APOSTROPHE), new KeyData('\''));
+		STANDALONES.put(join(COLON), KD_COLON);
+	}
 
 	// LIGATURES
 	private static final HashMap<Integer[], KeyData[][]> LIGATURES = new HashMap<Integer[], KeyData[][]>();
@@ -1679,5 +1786,6 @@ public class TextAreaBraille extends JTextArea {
 	static {
 		populateBrailleMap();
 		populateAlphabeticWordsignsAndGroupSigns();
+		addStandAlonesToBrailleMap();
 	}
 }
