@@ -23,6 +23,7 @@ class MapData {
 	public static final int STRING = 64;
 	public static final int STANDALONE = 128;
 	public static final int SUBSTITUTION = 256;
+	public static final int WORDSIGN = 512;
 	public static final int FINAL = 120;
 	public static final int CONCRETE = 126;
 
@@ -95,8 +96,8 @@ class MapData {
 	public boolean isOverflow() {return (type & OVERFLOWS) > 0;}
 	public boolean isWhitespace() {return (type & WHITESPACE) > 0;}
 	public boolean isStandAloneMarker() {return (type & STANDALONE) > 0;}
-	public boolean isExpandable() {return (isAlphabet() && !isCharacter() && !isString());}
 	public boolean isSubstitution() {return (type & SUBSTITUTION) > 0;}
+	public boolean isWordSign() {return (type & WORDSIGN) > 0;}
 }
 
 class KeyData {
@@ -508,7 +509,7 @@ public class TextAreaBraille extends JTextArea {
 
 				if (md.isStandAloneMarker() &&
 					recentHistory.getFirst().mapData.isStandAloneMarker() &&
-					recentHistory.getLast().mapData.isExpandable() &&
+					recentHistory.getLast().mapData.isWordSign() &&
 					!recentHistory.getLast().grade1 &&
 					!grade1.isOn()) {
 					MapData result = md;
@@ -575,7 +576,7 @@ public class TextAreaBraille extends JTextArea {
 	private static void addAlphabetsToBrailleMap() {
 		for (Integer code: ALPHABET.keySet()) {
 			Integer[] codes = {code};
-			addToBrailleMap(codes, MapData.ALPHABET, ALPHABET.get(code)[LOWER], ALPHABET.get(code)[UPPER]);
+			addToBrailleMap(codes, MapData.ALPHABET | MapData.WORDSIGN, ALPHABET.get(code)[LOWER], ALPHABET.get(code)[UPPER]);
 		}
 		for (Integer[] codes: GREEK.keySet()) {
 			addToBrailleMap(codes, MapData.ALPHABET, GREEK.get(codes)[LOWER], GREEK.get(codes)[UPPER]);
@@ -751,9 +752,9 @@ public class TextAreaBraille extends JTextArea {
 		charToKeyData.put('@', KD_AT_SIGN);
 
 		// ALPHABETIC WORDSIGNS
-		for (String[] subs: WORDSIGNS) {
+		for (HashMap<String, String> signs: WORDSIGN_DICTIONARIES) {
 			// Is the upper case a reflection of the lower, or independent?
-			boolean upperFromLower = (subs[1] == "") ? true : false;
+			boolean upperFromLower = (signs.get("upperFromLower") == "true") ? true : false;
 			int mdType = 0;
 			if (upperFromLower) {
 				mdType = MapData.STRING | MapData.ALPHABET;
@@ -766,21 +767,24 @@ public class TextAreaBraille extends JTextArea {
 			// does not match the contraction letter. There we have to backspace and the case of the
 			// first letter may not match the case of the rest of the word. IN other cases, the first letter
 			// remains unaltered, so there is no complication.
-			for (int i = 0; i < 26; i++) {
+			//for (int i = 0; i < 26; i++) {
+			for (Integer code: ALPHABET.keySet()) {
 				ArrayList<KeyData> lower = null;
 				ArrayList<KeyData> upper = null;
 				// Used in the case when SUBSTITUTTION is set.
 				ArrayList<KeyData> upperWithLower = null;
 				ArrayList<KeyData> lowerWithUpper = null;
 				// If there is a lower case contraction.
-				if (subs[i+2] != "") {
+				char cLower = ALPHABET.get(code)[LOWER][0].keyChar;
+				String aLower = String.valueOf(cLower);
+				//if (subs[i+2] != "") {
+				if (signs.get(aLower) != null) {
 					lower = new ArrayList<KeyData>();
 					if (upperFromLower) upper = new ArrayList<KeyData>();
-					String sub = subs[i+2];
-					char keyChar = ALPHABET.get(pinCodes[i])[LOWER][0].keyChar;
+					String sub = signs.get(aLower);
 					// Is the contraction's trigger letter the same as the first letter of the word itself? (eg: x = it)
 					// Want to do as much work here as possible, rather than when typing.
-					if (sub.charAt(0) != keyChar) {
+					if (sub.charAt(0) != cLower) {
 						if (!upperFromLower) {
 							// The easy case.
 							lower.add(KD_BACKSPACE);
@@ -804,20 +808,20 @@ public class TextAreaBraille extends JTextArea {
 						lower.add(charToKeyData.get(sub.charAt(c)));
 						if (upperFromLower) {
 							upper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(c))));
-							if (sub.charAt(0) != keyChar) {
+							if (sub.charAt(0) != cLower) {
 								upperWithLower.add(charToKeyData.get(sub.charAt(c)));
 								lowerWithUpper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(c))));
 							}
 						}
 					}
 				}
-				if (!upperFromLower && subs[i+28] != "") {
+				String aUpper = aLower.toUpperCase();
+				if (!upperFromLower && signs.get(aUpper) != null) {
 					upper = new ArrayList<KeyData>();
-					String sub = subs[i+28];
-					char keyChar = ALPHABET.get(pinCodes[i])[UPPER][0].keyChar;
+					String sub = signs.get(aUpper);
+					char cUpper = ALPHABET.get(code)[UPPER][0].keyChar;
 					// Is the contraction's trigger letter the same as the first letter of the word itself? (eg: x = it)
-					if (sub.charAt(0) != keyChar) {
-						log.info("CHARS: " + sub.charAt(0) + ", " + keyChar);
+					if (sub.charAt(0) != cUpper) {
 						upper.add(KD_BACKSPACE);
 						upper.add(charToKeyData.get(sub.charAt(0)));	
 					}
@@ -832,10 +836,10 @@ public class TextAreaBraille extends JTextArea {
 					pair.keyData.add(lowerWithUpper);
 				}
 
-				dict.put(pinCodes[i], pair);
+				dict.put(code, pair);
 			}
 
-			ALPHABETIC_WORDSIGNS.put(subs[0], dict);
+			ALPHABETIC_WORDSIGNS.put(signs.get("name"), dict);
 
 			// GROUPSIGNS
 			// As there's no way of implementing a shift mid-sign, LOWER_WITH_UPPER is impossible.
@@ -856,6 +860,27 @@ public class TextAreaBraille extends JTextArea {
 				}
 				BRAILLE_MAP.put(code, triplet);
 			}
+		
+			// WORDSIGNS
+			// As there's no way of implementing a shift mid-sign, LOWER_WITH_UPPER is impossible.
+			for (Integer code: WORDSIGNS.keySet()) {
+				MapData triplet = new MapData(MapData.STRING | MapData.ALPHABET | MapData.WORDSIGN, new ArrayList<ArrayList<KeyData>>());
+				for (int i = 0; i < 3; i++) triplet.keyData.add(new ArrayList<KeyData>());
+				String groupSign = WORDSIGNS.get(code);
+				for (int c = 0; c < groupSign.length(); c++) {
+					char cLower = groupSign.charAt(c);
+					char cUpper = Character.toUpperCase(cLower);
+					triplet.keyData.get(LOWER).add(charToKeyData.get(cLower));
+					triplet.keyData.get(UPPER).add(charToKeyData.get(cUpper));
+					if (c == 0) {
+						triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cUpper));
+					} else {
+						triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cLower));
+					}
+				}
+				BRAILLE_MAP.put(code, triplet);
+			}
+
 		}
 	}
 
@@ -1280,21 +1305,12 @@ public class TextAreaBraille extends JTextArea {
 
 	private static final HashMap<Integer, String> GROUPSIGNS = new HashMap<Integer, String>();
 	static {
-		GROUPSIGNS.put(CH, "ch");
 		GROUPSIGNS.put(GH, "gh");
-		GROUPSIGNS.put(SH, "sh");
-		GROUPSIGNS.put(TH, "th");
-		GROUPSIGNS.put(WH, "wh");
 		GROUPSIGNS.put(ED, "ed");
 		GROUPSIGNS.put(ER, "er");
-		GROUPSIGNS.put(OU, "ou");
 		GROUPSIGNS.put(OW, "ow");
-		GROUPSIGNS.put(ST, "st");
 		GROUPSIGNS.put(ING, "ing");
 		GROUPSIGNS.put(AR, "ar");
-		GROUPSIGNS.put(EN, "en");
-		GROUPSIGNS.put(GG, "gg");
-		GROUPSIGNS.put(IN, "in");
 		// Actually contractions, but treat the same.
 		GROUPSIGNS.put(AND, "and");
 		GROUPSIGNS.put(FOR, "for");
@@ -1318,6 +1334,20 @@ public class TextAreaBraille extends JTextArea {
 //	private static final Integer HIS = QUESTION_MARK;
 //	private static final Integer IN = IN;
 	private static final Integer WAS = 52;
+
+	private static final HashMap<Integer, String> WORDSIGNS = new HashMap<Integer, String>();
+	static {
+		WORDSIGNS.put(CH, "ch");
+		WORDSIGNS.put(SH, "sh");
+		WORDSIGNS.put(TH, "th");
+		WORDSIGNS.put(WH, "wh");
+		WORDSIGNS.put(OU, "ou");
+		WORDSIGNS.put(ST, "st");
+		WORDSIGNS.put(EN, "en");
+		WORDSIGNS.put(GG, "gg");
+		WORDSIGNS.put(IN, "in");
+		WORDSIGNS.put(WAS, "ea");
+	}
 
 	// SIMPLE PUNCTUATION
 	private static final Integer APOSTROPHE = 4;
@@ -1574,11 +1604,32 @@ public class TextAreaBraille extends JTextArea {
 	private static final HashMap<String, HashMap<Integer, MapData>> ALPHABETIC_WORDSIGNS =
 		new HashMap<String, HashMap<Integer, MapData>>();
 
-	private static final String[] DEFAULT_ALPHABETIC_WORDSIGNS = {
-		"default" /*name*/, "" /*"" if same for lower and upper case*/,
+	private static final String[] DEFAULT_LOWER = {
 		"", "but", "can", "do", "every", "from", "go", "have", "", "just", "knowledge", "like", "more",
 		"not", "", "people", "quite", "rather", "so", "that", "us", "very", "will", "it", "you", "as"
 	};
+	private static final HashMap<String, String> DEFAULT_ALPHABETIC_WORDSIGNS = new HashMap<String, String>();
+	static {
+		DEFAULT_ALPHABETIC_WORDSIGNS.put("name", "default");
+		DEFAULT_ALPHABETIC_WORDSIGNS.put("upperFromLower", "true");
+		int index = 0;
+		for (KeyData[][] kd: ALPHABET.values()) {  //LinkedList, so ordered
+			if (DEFAULT_LOWER[index] != "") {
+				DEFAULT_ALPHABETIC_WORDSIGNS.put(String.valueOf(kd[LOWER][0].keyChar), DEFAULT_LOWER[index]);
+			}
+			index++;
+		}
+		DEFAULT_ALPHABETIC_WORDSIGNS.put("ch", "child");
+		DEFAULT_ALPHABETIC_WORDSIGNS.put("sh", "shall");
+		DEFAULT_ALPHABETIC_WORDSIGNS.put("th", "this");
+		DEFAULT_ALPHABETIC_WORDSIGNS.put("wh", "which");
+		DEFAULT_ALPHABETIC_WORDSIGNS.put("ou", "out");
+		DEFAULT_ALPHABETIC_WORDSIGNS.put("st", "still");
+		DEFAULT_ALPHABETIC_WORDSIGNS.put("en", "enough");
+		DEFAULT_ALPHABETIC_WORDSIGNS.put("gg", "were");
+		DEFAULT_ALPHABETIC_WORDSIGNS.put("in", "in");
+		DEFAULT_ALPHABETIC_WORDSIGNS.put("was", "was");
+	}
 
 	private static final String[] GENEALOGY_ALPHABETIC_WORDSIGNS = {
 		"genealogy", "U", 
@@ -1588,15 +1639,41 @@ public class TextAreaBraille extends JTextArea {
 		"N", "O", "Probate", "Q", "R", "S", "T", "Burial", "V", "Will", "X", "Y", "Z"
 	};
 
-	private static final String[] JAVA_ALPHABETIC_WORDSIGNS = {
-		"java", "U",
-		"new", "boolean", "char", "double", "enum", "float", "switch", "case", "int", "", "break", "class", "",
-		"null", "for", "private", "", "return", "static", "this", "public", "void", "while", "if", "else", "final",
-		"ArrayList", "Boolean", "Character", "Double", "", "Float", "Logger", "HashMap", "Integer", "", "", "List", "",
-		"", "@Override", "", "", "Arrays", "String", "T", "", "", "", "", "System", ""
+	private static final String[] JAVA_LOWER = {
+		"new", "boolean", "case", "double", "else", "float", "", "", "if", "", "break", "class", "",
+		"null", "valueOf", "private", "", "return", "switch", "this", "public", "void", "while", "", "", "final"
 	};
+	private static final String[] JAVA_UPPER = {
+		"ArrayList", "Boolean", "", "Double", "", "Float", "Logger", "HashMap", "", "", "", "List", "",
+		"", "@Override", "", "", "Arrays", "System", "T", "", "", "", "", "", ""
+	};
+	private static final HashMap<String, String> JAVA_ALPHABETIC_WORDSIGNS = new HashMap<String, String>();
+	static {
+		JAVA_ALPHABETIC_WORDSIGNS.put("name", "java");
+		JAVA_ALPHABETIC_WORDSIGNS.put("upperFromLower", "false");
+		int index = 0;
+		for (KeyData[][] kd: ALPHABET.values()) {  //LinkedList, so ordered
+			if (JAVA_LOWER[index] != "") {
+				JAVA_ALPHABETIC_WORDSIGNS.put(String.valueOf(kd[LOWER][0].keyChar), JAVA_LOWER[index]);
+			}
+			if (JAVA_UPPER[index] != "") {
+				JAVA_ALPHABETIC_WORDSIGNS.put(String.valueOf(kd[UPPER][0].keyChar), JAVA_UPPER[index]);
+			}
+			index++;
+		}
+		JAVA_ALPHABETIC_WORDSIGNS.put("ch", "char");
+		JAVA_ALPHABETIC_WORDSIGNS.put("st", "static");
+		JAVA_ALPHABETIC_WORDSIGNS.put("en", "enum");
+		JAVA_ALPHABETIC_WORDSIGNS.put("in", "int");
+		JAVA_ALPHABETIC_WORDSIGNS.put("CH", "Character");
+		JAVA_ALPHABETIC_WORDSIGNS.put("ST", "String");
+		JAVA_ALPHABETIC_WORDSIGNS.put("IN", "Integer");
+	}
 
-	private static final String[][] WORDSIGNS = {DEFAULT_ALPHABETIC_WORDSIGNS};
+	private static final ArrayList<HashMap<String, String>> WORDSIGN_DICTIONARIES = new ArrayList<HashMap<String, String>>();
+	static {
+		WORDSIGN_DICTIONARIES.add(DEFAULT_ALPHABETIC_WORDSIGNS);
+	}
 
 	private static final HashMap<Integer, MapData> BRAILLE_MAP = new HashMap<Integer, MapData>();
 	static {
