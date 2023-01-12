@@ -624,6 +624,11 @@ public class TextAreaBraille extends JTextArea {
 		}
 	}
 
+	private static void addCharsToBrailleMap() {
+		for (Integer[] code: CHARACTERS.keySet()) {
+			addCharToBrailleMap(code, CHARACTERS.get(code));
+		}
+	}
 	private static void addCharToBrailleMap(Integer[] pinCodes, KeyData... keyData) {
 		addToBrailleMap(pinCodes, MapData.CHARACTER, keyData, null);
 	}
@@ -639,10 +644,6 @@ public class TextAreaBraille extends JTextArea {
 	}
 	private static void addStandAloneToBrailleMap(Integer[] pinCodes, KeyData... keyData) {
 		addToBrailleMap(pinCodes, MapData.CHARACTER | MapData.STANDALONE, keyData, null);
-	}
-	private static void addStandAloneToBrailleMap(Integer pinCode, KeyData... keyData) {
-		Integer[] pinCodes = {pinCode};
-		addStandAloneToBrailleMap(pinCodes, keyData);
 	}
 
 	private static void addWhitespaceToBrailleMap(Integer pinCode, KeyData... keyData) {
@@ -1022,25 +1023,17 @@ public class TextAreaBraille extends JTextArea {
 			addStandAloneToBrailleMap(join(prefix, COLON), KD_COLON);
 		}
 
-		// MUSIC
-        addCharToBrailleMap(SHARP, new KeyData('♯'));
-
 		// SIMPLE PUNCTUATION
 		addStandAloneToBrailleMap(ANGLE_QUOTE_OPEN, new KeyData('«'));
 		addStandAloneToBrailleMap(ANGLE_QUOTE_CLOSE, new KeyData('»'));
 		addStandAloneToBrailleMap(BACK_SLASH, KD_BACK_SLASH);
 		addStandAloneToBrailleMap(BULLET, new KeyData('•'));
 		addStandAloneToBrailleMap(CARET, new KeyData('^', true));
-		addStandAloneToBrailleMap(COMMA, KD_COMMA);
-		addStandAloneToBrailleMap(EXCLAMATION, new KeyData('!', KeyEvent.VK_EXCLAMATION_MARK, true));
 		addStandAloneToBrailleMap(FORWARD_SLASH, KD_FORWARD_SLASH);
-		addStandAloneToBrailleMap(FULLSTOP, KD_FULLSTOP);
-		addStandAloneToBrailleMap(HYPHEN, KD_MINUS);
 		addStandAloneToBrailleMap(NUMBER, new KeyData('#'));
 //		addToBrailleMap(join(PRIME), MapData.ALPHABET | MapData.OVERFLOWS | MapData.STANDALONE, new KeyData('′'), KD_QUOTE);
 		addStandAloneToBrailleMap(QUOTE_OPEN, new KeyData('“'));
 		addStandAloneToBrailleMap(QUOTE_CLOSE, new KeyData('”'));
-		addStandAloneToBrailleMap(SEMICOLON, new KeyData(';', KeyEvent.VK_SEMICOLON));
 		addStandAloneToBrailleMap(TILDE, new KeyData('~', true));
 		addCharToBrailleMap(UNDERSCORE, new KeyData('_', KeyEvent.VK_UNDERSCORE, true));
 
@@ -1466,6 +1459,11 @@ public class TextAreaBraille extends JTextArea {
 	static {
 		STANDALONES.put(join(APOSTROPHE), new KeyData('\''));
 		STANDALONES.put(join(COLON), KD_COLON);
+		STANDALONES.put(join(COMMA), KD_COMMA);
+		STANDALONES.put(join(EXCLAMATION), new KeyData('!', KeyEvent.VK_EXCLAMATION_MARK, true));
+		STANDALONES.put(join(FULLSTOP), KD_FULLSTOP);
+		STANDALONES.put(join(HYPHEN), KD_MINUS);
+		STANDALONES.put(join(SEMICOLON), new KeyData(';', KeyEvent.VK_SEMICOLON));
 	}
 
 	// LIGATURES
@@ -1484,20 +1482,8 @@ public class TextAreaBraille extends JTextArea {
 		LIGATURES.put(join(As, At), link(KD_Lst, null));
 		LIGATURES.put(join(Au, Ae), link(KD_Lue, null));
 	}
-/*
+
 	// NUMBERS
-	private static final Integer N1 = CH;
-	private static final Integer N2 = GROUP_OPEN;
-	private static final Integer N3 = SH;
-	private static final Integer N4 = TH;
-	private static final Integer N5 = WH;
-	private static final Integer N6 = ED;
-	private static final Integer N7 = ER;
-	private static final Integer N8 = OU;
-	private static final Integer N9 = OW;
-	private static final Integer N0 = FOR;
-*/
-//	private static final Integer[] N_TEN = join(N1, N2, N3, N4, N5, N6, N7, N8, N9, N0);
 	private static final Integer[] D_TEN = join(Aa, Ab, Ac, Ad, Ae, Af, Ag, Ah, Ai, Aj);
 	private static final KeyData[] KD_TEN = join(KD_1, KD_2, KD_3, KD_4, KD_5, KD_6, KD_7, KD_8, KD_9, KD_0);
 
@@ -1505,6 +1491,11 @@ public class TextAreaBraille extends JTextArea {
 	//private static final Integer[] NATURAL = join(DIGIT, CH); // No Arial char
 	//private static final Integer[] FLAT = join(DIGIT, GROUP_OPEN); // No Arial char
 	private static final Integer[] SHARP = join(DIGIT, SH);
+
+	private static final HashMap<Integer[], KeyData> CHARACTERS = new HashMap<Integer[], KeyData>();
+	static {
+		CHARACTERS.put(SHARP, new KeyData('♯'));
+	}
 
 	// COMPLEX PUNCTUATION
 //	private static final Integer[] DOUBLE_PRIME = join(PRIME, PRIME);
@@ -1787,5 +1778,6 @@ public class TextAreaBraille extends JTextArea {
 		populateBrailleMap();
 		populateAlphabeticWordsignsAndGroupSigns();
 		addStandAlonesToBrailleMap();
+		addCharsToBrailleMap();
 	}
 }
