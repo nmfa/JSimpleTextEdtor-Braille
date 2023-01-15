@@ -174,7 +174,7 @@ public class TextAreaBraille extends JTextArea {
 	private ArrayDeque<History> recentHistory = new ArrayDeque<History>(2);
 	private String currentWordContractions = "default";
 	private int wordLength = 0;
-	private LOCK grade1 = LOCK.OFF;
+	private LOCK grade1 = LOCK.OFF; // Only in use to block alphabetic wordsigns. On or Off only.
 	private LOCK shift = LOCK.OFF;
 	private LOCK shift40 = LOCK.OFF;
 	private LOCK digit = LOCK.OFF;
@@ -251,7 +251,7 @@ public class TextAreaBraille extends JTextArea {
 			 currentPinCode == SHIFT40 || 
 			 currentPinCode == DIGIT)) {
 			if (!(currentPinCodesList.size() > 0 && currentPinCodesList.get(0) == SHIFT8)) {
-				if (currentPinCode == GRADE1) {
+				if (currentPinCode == GRADE1 && grade1.isOff()) { // On or Off only, for 1 character.
 					grade1 = grade1.next();
 					log.info("GRADE1: " + grade1);
 					// Doesn't reset shifts or digit as only affects contraction.
@@ -537,6 +537,10 @@ public class TextAreaBraille extends JTextArea {
 						}
 					}
 				} // else // CHARACTER, STRING, none of which can't be modified.
+
+				// The SHIFT 48 Groupsigns when not blocking an alphabetic contraction,
+
+
 				return md;
 			}
 			if (md.isModifier()) mdModifier = md;
@@ -581,11 +585,13 @@ public class TextAreaBraille extends JTextArea {
 
 	private static void addAlphabetsToBrailleMap() {
 		for (Integer code: ALPHABET.keySet()) {
-			Integer[] codes = {code};
-			addToBrailleMap(codes, MapData.ALPHABET | MapData.WORDSIGN, ALPHABET.get(code)[LOWER], ALPHABET.get(code)[UPPER]);
+			addToBrailleMap(join(code), MapData.ALPHABET | MapData.WORDSIGN, ALPHABET.get(code)[LOWER], ALPHABET.get(code)[UPPER]);
 		}
 		for (Integer[] codes: GREEK.keySet()) {
 			addToBrailleMap(codes, MapData.ALPHABET, GREEK.get(codes)[LOWER], GREEK.get(codes)[UPPER]);
+		}
+		for (Integer[] codes: PHONETICS.keySet()) {
+			addToBrailleMap(codes, MapData.ALPHABET, PHONETICS.get(codes)[LOWER], PHONETICS.get(codes)[UPPER]);
 		}
 	}
 
@@ -621,6 +627,12 @@ public class TextAreaBraille extends JTextArea {
 					addToBrailleMap(join(mCodes, aCode), MapData.ALPHABET | MapData.MODIFIER, pair[LOWER], pair[UPPER]);
 				}
 			}
+		}
+	}
+
+	private static void addDigitsToBrailleMap() {
+		for (Integer code: DIGITS.keySet()) {
+			addCharToBrailleMap(join(DIGIT, code), DIGITS.get(code));
 		}
 	}
 
@@ -667,26 +679,32 @@ public class TextAreaBraille extends JTextArea {
 	}
 
 	private static void addToBrailleMap(Integer[] pinCodes, int type, KeyData[] keyDataLower, KeyData[] keyDataUpper) {
+		ArrayList<ArrayList<KeyData>> keyData = new ArrayList<ArrayList<KeyData>>();
+		keyData.add(new ArrayList<KeyData>(Arrays.asList(keyDataLower)));
+		if (keyDataUpper != null) {
+			keyData.add(new ArrayList<KeyData>(Arrays.asList(keyDataUpper)));
+		}
 		addToBrailleMap(pinCodes,
 						type,
 						0,
-						new ArrayList<KeyData>(Arrays.asList(keyDataLower)),
-						(keyDataUpper == null) ? null : new ArrayList<KeyData>(Arrays.asList(keyDataUpper)),
+						keyData,
+						BRAILLE_MAP);
+	}
+
+	private static void addToBrailleMap(Integer[] pinCodes, int type, ArrayList<ArrayList<KeyData>> keyData) {
+		addToBrailleMap(pinCodes,
+						type,
+						0,
+						keyData,
 						BRAILLE_MAP);
 	}
 
 	private static void addToBrailleMap(Integer[] pinCodes,
 										int type,
 										int pcIndex,
-										ArrayList<KeyData> keyDataLower,
-										ArrayList<KeyData> keyDataUpper,
+										ArrayList<ArrayList<KeyData>> keyData,
 										HashMap<Integer, MapData> map) {
 		MapData mapData =  map.get(pinCodes[pcIndex]);
-		ArrayList<ArrayList<KeyData>> keyData = new ArrayList<ArrayList<KeyData>>();
-		keyData.add(keyDataLower);
-		if (keyDataUpper != null) {
-			keyData.add(keyDataUpper);
-		}
 		if (mapData != null) {
 			if (pcIndex + 1 == pinCodes.length) {
 				if (mapData.keyData != null) {
@@ -702,7 +720,7 @@ public class TextAreaBraille extends JTextArea {
 				// In the case where KeyData exists, but the same symbol can also be part of a combination
 				// eg: rime & double prime
 				if (mapData.map == null) mapData.addMap();
-				addToBrailleMap(pinCodes, type, pcIndex + 1, keyDataLower, keyDataUpper, mapData.map);
+				addToBrailleMap(pinCodes, type, pcIndex + 1, keyData, mapData.map);
 			}
 		} else {
 			if (pcIndex + 1 == pinCodes.length) {
@@ -711,7 +729,7 @@ public class TextAreaBraille extends JTextArea {
 			} else {
 				MapData md = new MapData();
 				map.put(pinCodes[pcIndex], md);
-				addToBrailleMap(pinCodes, type, pcIndex + 1, keyDataLower, keyDataUpper, md.map);
+				addToBrailleMap(pinCodes, type, pcIndex + 1, keyData, md.map);
 			}
 		}
 	}
@@ -762,6 +780,10 @@ public class TextAreaBraille extends JTextArea {
 			charToKeyData.put(ALPHABET.get(code)[UPPER][0].keyChar, ALPHABET.get(code)[UPPER][0]);
 		}
 		charToKeyData.put('@', KD_AT_SIGN);
+		charToKeyData.put('-', KD_MINUS);
+		charToKeyData.put(' ', KD_SPACE);
+		charToKeyData.put(';', KD_SEMICOLON);
+		charToKeyData.put('?', KD_QUESTION_MARK);
 
 		// ALPHABETIC WORDSIGNS
 		for (HashMap<String, String> signs: WORDSIGN_DICTIONARIES) {
@@ -854,39 +876,46 @@ public class TextAreaBraille extends JTextArea {
 
 		// GROUPSIGNS
 		// As there's no way of implementing a shift mid-sign, LOWER_WITH_UPPER is impossible.
-		for (Integer code: GROUPSIGNS.keySet()) {
-			MapData triplet = new MapData(MapData.STRING | MapData.ALPHABET, new ArrayList<ArrayList<KeyData>>());
-			for (int i = 0; i < 3; i++) triplet.keyData.add(new ArrayList<KeyData>());
+		for (Integer[] code: GROUPSIGNS.keySet()) {
+			ArrayList<ArrayList<KeyData>> keyData = new  ArrayList<ArrayList<KeyData>>();
+			for (int i = 0; i < 3; i++) keyData.add(new ArrayList<KeyData>());
 			String groupSign = GROUPSIGNS.get(code);
 			for (int c = 0; c < groupSign.length(); c++) {
 				char cLower = groupSign.charAt(c);
 				char cUpper = Character.toUpperCase(cLower);
-				triplet.keyData.get(LOWER).add(charToKeyData.get(cLower));
-				triplet.keyData.get(UPPER).add(charToKeyData.get(cUpper));
+				keyData.get(LOWER).add(charToKeyData.get(cLower));
+				keyData.get(UPPER).add(charToKeyData.get(cUpper));
 				if (c == 0) {
-					triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cUpper));
+					keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cUpper));
 				} else {
-					triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cLower));
+					keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cLower));
 				}
 			}
-			BRAILLE_MAP.put(code, triplet);
+			addToBrailleMap(code, MapData.STRING | MapData.ALPHABET, keyData);
 		}
 		
 		// WORDSIGNS
 		// As there's no way of implementing a shift mid-sign, LOWER_WITH_UPPER is impossible.
 		for (Integer code: WORDSIGNS.keySet()) {
-			MapData triplet = new MapData(MapData.STRING | MapData.ALPHABET | MapData.WORDSIGN, new ArrayList<ArrayList<KeyData>>());
-			for (int i = 0; i < 3; i++) triplet.keyData.add(new ArrayList<KeyData>());
-			String groupSign = WORDSIGNS.get(code);
-			for (int c = 0; c < groupSign.length(); c++) {
-				char cLower = groupSign.charAt(c);
-				char cUpper = Character.toUpperCase(cLower);
-				triplet.keyData.get(LOWER).add(charToKeyData.get(cLower));
-				triplet.keyData.get(UPPER).add(charToKeyData.get(cUpper));
-				if (c == 0) {
-					triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cUpper));
-				} else {
-					triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cLower));
+			// The ; and ? wordsigns also act as standalones
+			MapData triplet = new MapData(0, new ArrayList<ArrayList<KeyData>>());			
+			if (WORDSIGNS.get(code).length() == 1) {
+				triplet.type = MapData.CHARACTER | MapData.WORDSIGN | MapData.STANDALONE;
+				triplet.keyData.add(new ArrayList<KeyData>(Arrays.asList(join(charToKeyData.get(WORDSIGNS.get(code).charAt(0))))));
+			} else {
+				triplet.type = MapData.STRING | MapData.ALPHABET | MapData.WORDSIGN;
+				for (int i = 0; i < 3; i++) triplet.keyData.add(new ArrayList<KeyData>());
+				String groupSign = WORDSIGNS.get(code);
+				for (int c = 0; c < groupSign.length(); c++) {
+					char cLower = groupSign.charAt(c);
+					char cUpper = Character.toUpperCase(cLower);
+					triplet.keyData.get(LOWER).add(charToKeyData.get(cLower));
+					triplet.keyData.get(UPPER).add(charToKeyData.get(cUpper));
+					if (c == 0) {
+						triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cUpper));
+					} else {
+						triplet.keyData.get(UPPER_WITH_LOWER).add(charToKeyData.get(cLower));
+					}
 				}
 			}
 			BRAILLE_MAP.put(code, triplet);
@@ -915,47 +944,46 @@ public class TextAreaBraille extends JTextArea {
 				ArrayList<KeyData> lowerWithUpper = null;
 				// If there is a lower case contraction.
 				String sLower = WORDSIGNS.get(code);
+				int sLength = sLower.length();
 				if (signs.get(sLower) != null) {
 					lower = new ArrayList<KeyData>();
 					if (upperFromLower) upper = new ArrayList<KeyData>();
 					String sub = signs.get(sLower);
 					// Is the contraction's trigger letter the same as the first letter of the word itself? (eg: x = it)
 					// Want to do as much work here as possible, rather than when typing.
-					if (sub.substring(0, 2) != sLower) {
+					if (sub.substring(0, sLength) != sLower) {
 						if (!upperFromLower) {
 							// The easy case.
-							lower.add(KD_BACKSPACE);
-							lower.add(KD_BACKSPACE);
-							lower.add(charToKeyData.get(sub.charAt(0)));
-							lower.add(charToKeyData.get(sub.charAt(1)));
+							for (int i = 0; i < sLength; i++) {
+								lower.add(KD_BACKSPACE);
+							}
+							for (int i = 0; i < sLength; i++) {
+								lower.add(charToKeyData.get(sub.charAt(i)));
+							}
 						} else {
 							mdType = mdType | MapData.SUBSTITUTION;
-							lower.add(KD_BACKSPACE);
-							lower.add(KD_BACKSPACE);
-							lower.add(charToKeyData.get(sub.charAt(0)));
-							lower.add(charToKeyData.get(sub.charAt(1)));
-							upper.add(KD_BACKSPACE);
-							upper.add(KD_BACKSPACE);
-							upper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(0))));
-							upper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(1))));
 							upperWithLower = new ArrayList<KeyData>();
-							upperWithLower.add(KD_BACKSPACE);
-							upperWithLower.add(KD_BACKSPACE);
-							upperWithLower.add(charToKeyData.get(Character.toUpperCase(sub.charAt(0))));
-							upperWithLower.add(charToKeyData.get(sub.charAt(1)));
 							lowerWithUpper = new ArrayList<KeyData>();
-							lowerWithUpper.add(KD_BACKSPACE);
-							lowerWithUpper.add(KD_BACKSPACE);
-							lowerWithUpper.add(charToKeyData.get(sub.charAt(0)));
-							lowerWithUpper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(1))));
+							for (int i = 0; i < sLength; i++) {
+								lower.add(KD_BACKSPACE);
+								upper.add(KD_BACKSPACE);
+								upperWithLower.add(KD_BACKSPACE);
+								lowerWithUpper.add(KD_BACKSPACE);
+							}
+							for (int i = 0; i < sLength; i++) {
+								lower.add(charToKeyData.get(sub.charAt(i)));
+								upper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(i))));
+								upperWithLower.add(charToKeyData.get(Character.toUpperCase(sub.charAt(i))));
+								lowerWithUpper.add(charToKeyData.get(sub.charAt(i)));
+							}
 						}
 					}
 					// Add the rest of the word.
-					for (int c = 2; c < sub.length(); c++) {
+					for (int c = sLength; c < sub.length(); c++) {
 						lower.add(charToKeyData.get(sub.charAt(c)));
 						if (upperFromLower) {
 							upper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(c))));
-							if (sub.substring(0, 2) != sLower) {
+							if (sub.substring(0, sLength) != sLower) {
 								upperWithLower.add(charToKeyData.get(sub.charAt(c)));
 								lowerWithUpper.add(charToKeyData.get(Character.toUpperCase(sub.charAt(c))));
 							}
@@ -967,14 +995,16 @@ public class TextAreaBraille extends JTextArea {
 					upper = new ArrayList<KeyData>();
 					String sub = signs.get(sUpper);
 					// Is the contraction's trigger letter the same as the first letter of the word itself? (eg: x = it)
-					if (sub.substring(0, 2) != sUpper) {
-						upper.add(KD_BACKSPACE);
-						upper.add(KD_BACKSPACE);
-						upper.add(charToKeyData.get(sub.charAt(0)));
-						upper.add(charToKeyData.get(sub.charAt(1)));
+					if (sub.substring(0, sLength) != sUpper) {
+						for (int i = 0; i < sLength; i++) {
+							upper.add(KD_BACKSPACE);
+						}
+						for (int i = 0; i < sLength; i++) {
+							upper.add(charToKeyData.get(sub.charAt(i)));
+						}
 					}
 					// Add the rest of the word.
-					for (int c = 1; c < sub.length(); c++) {
+					for (int c = sLength; c < sub.length(); c++) {
 						upper.add(charToKeyData.get(sub.charAt(c)));
 					}
 				}
@@ -992,74 +1022,15 @@ public class TextAreaBraille extends JTextArea {
 
     private static void populateBrailleMap() {
 		// ENGLISH ALPHABET
-		addAlphabetsToBrailleMap();
-		addToBrailleMap(ENG, MapData.ALPHABET, new KeyData('ŋ', 331), new KeyData('Ŋ', 330));
-		addToBrailleMap(SCHWA, MapData.ALPHABET, new KeyData('ə', 601), new KeyData('Ə', 399));
-		addCombiningCharsToBrailleMap();
 		addToBrailleMap(LIGATURE, MapData.LIGATURE | MapData.OVERFLOWS, KD_LIGATURE, null);
-		addLigaturesToBrailleMap();
 
 		addWhitespaceToBrailleMap(ENTER, KD_ENTER);
 		addWhitespaceToBrailleMap(SPACE, KD_SPACE);
  	
 		// NUMBERS
-		addToBrailleMap(join(DIGIT, SHIFT16), MapData.CHARACTER | MapData.OVERFLOWS | MapData.STANDALONE, KD_SPACE, null);
-		for (int i = 0; i < 10; i++) {
-			addCharToBrailleMap(join(DIGIT, D_TEN[i]), KD_TEN[i]);
-			addCharToBrailleMap(join(DIGIT, SHIFT16, D_TEN[i]),  KD_TEN[i]);
-		}
-		Integer[][] prefixes = {{DIGIT}, {DIGIT, SHIFT16}};
-		for (Integer[] prefix: prefixes) {
-			addStandAloneToBrailleMap(join(prefix, COMMA), KD_COMMA);
-			addStandAloneToBrailleMap(join(prefix, FULLSTOP), KD_FULLSTOP);
-			addCharToBrailleMap(join(prefix, EXCLAMATION), KD_PLUS);
-			addStandAloneToBrailleMap(join(prefix, HYPHEN), KD_MINUS);
-			addCharToBrailleMap(join(prefix, IN), KD_ASTERISK);
-			addStandAloneToBrailleMap(join(prefix, ST), KD_FORWARD_SLASH);
-			addStandAloneToBrailleMap(join(prefix, CH), KD_BACK_SLASH);
-			addCharToBrailleMap(join(prefix, GG), KD_EQUALS);
-			addStandAloneToBrailleMap(join(prefix, GROUP_OPEN), KD_LESS_THAN);
-			addStandAloneToBrailleMap(join(prefix, GROUP_CLOSE), KD_GREATER_THAN);
-			addStandAloneToBrailleMap(join(prefix, COLON), KD_COLON);
-		}
-
-		// SIMPLE PUNCTUATION
-		addStandAloneToBrailleMap(ANGLE_QUOTE_OPEN, new KeyData('«'));
-		addStandAloneToBrailleMap(ANGLE_QUOTE_CLOSE, new KeyData('»'));
-		addStandAloneToBrailleMap(BACK_SLASH, KD_BACK_SLASH);
-		addStandAloneToBrailleMap(BULLET, new KeyData('•'));
-		addStandAloneToBrailleMap(CARET, new KeyData('^', true));
-		addStandAloneToBrailleMap(FORWARD_SLASH, KD_FORWARD_SLASH);
-		addStandAloneToBrailleMap(NUMBER, new KeyData('#'));
-//		addToBrailleMap(join(PRIME), MapData.ALPHABET | MapData.OVERFLOWS | MapData.STANDALONE, new KeyData('′'), KD_QUOTE);
-		addStandAloneToBrailleMap(QUOTE_OPEN, new KeyData('“'));
-		addStandAloneToBrailleMap(QUOTE_CLOSE, new KeyData('”'));
-		addStandAloneToBrailleMap(TILDE, new KeyData('~', true));
-		addCharToBrailleMap(UNDERSCORE, new KeyData('_', KeyEvent.VK_UNDERSCORE, true));
-
-		// COMPLEX PUNCTUATION
-		addToBrailleMap(join(QUESTION_MARK), MapData.ALPHABET | MapData.STANDALONE, new KeyData('?'), new KeyData('‘'));
-//		addToBrailleMap(join(QUESTION_MARK_INVERTED), MapData.ALPHABET | MapData.STANDALONE, new KeyData('¿'), new KeyData('’'));
-//		addToBrailleMap(DOUBLE_PRIME, MapData.ALPHABET | MapData.STANDALONE, join(KD_BACKSPACE, new KeyData('″')), join(KD_QUOTE));
-
-		// GROUP PUNCTUATION
-		addStandAloneToBrailleMap(ANGLE_BRACKET_OPEN, KD_LESS_THAN);
-		addStandAloneToBrailleMap(ANGLE_BRACKET_CLOSE, KD_GREATER_THAN);
-		addStandAloneToBrailleMap(CURLY_BRACKET_OPEN, new KeyData('{', true));
-		addStandAloneToBrailleMap(CURLY_BRACKET_CLOSE, new KeyData('}', true));
-		addStandAloneToBrailleMap(ROUND_BRACKET_OPEN, new KeyData('(', true));
-		addStandAloneToBrailleMap(ROUND_BRACKET_CLOSE, new KeyData(')', true));
-		addStandAloneToBrailleMap(SQUARE_BRACKET_OPEN, new KeyData('['));
-		addStandAloneToBrailleMap(SQUARE_BRACKET_CLOSE, new KeyData(']'));
-
-		// CURRENCY
-		addCharToBrailleMap(CENT, new KeyData('¢'));
-		addCharToBrailleMap(DOLLAR, new KeyData('$', KeyEvent.VK_DOLLAR, true));
-		addCharToBrailleMap(EURO, new KeyData('€'));
-		addCharToBrailleMap(FRANC, new KeyData('₣'));
-		addCharToBrailleMap(GBP, new KeyData('£', true));
-		addCharToBrailleMap(NAIRA, new KeyData('₦'));
-		addCharToBrailleMap(YEN, new KeyData('¥'));
+		addCharToBrailleMap(join(DIGIT, EN), KD_CARET);
+		addCharToBrailleMap(join(DIGIT, GROUP_OPEN), KD_LESS_THAN);
+		addCharToBrailleMap(join(DIGIT, GROUP_CLOSE), KD_GREATER_THAN);
 
 		// MATHS
 		addCharToBrailleMap(ASTERISK, KD_ASTERISK);
@@ -1068,23 +1039,8 @@ public class TextAreaBraille extends JTextArea {
 		addCharToBrailleMap(EQUALS, KD_EQUALS);
 		addCharToBrailleMap(MINUS, KD_MINUS);
 		addCharToBrailleMap(MULTIPLY, new KeyData('×'));
-		addCharToBrailleMap(PERCENT, new KeyData('\u0025', 37));
 		addCharToBrailleMap(PLUS, KD_PLUS);
 	
-		// SYMBOLS
-		addCharToBrailleMap(AMPERSAND, new KeyData('&', true));
-		addCharToBrailleMap(AT_SIGN, KD_AT_SIGN);
-		addStandAloneToBrailleMap(COPYRIGHT, new KeyData('©'));
-		addStandAloneToBrailleMap(DAGGER, new KeyData('†'));
-		addStandAloneToBrailleMap(DOUBLE_DAGGER, new KeyData('‡'));
-		addCharToBrailleMap(DEGREES, new KeyData('°'));
-		addCharToBrailleMap(FEMALE, new KeyData('♀'));
-		addCharToBrailleMap(MALE, new KeyData('♂'));
-		addStandAloneToBrailleMap(PARAGRAPH, new KeyData('¶'));
-		addStandAloneToBrailleMap(REGISTERED, new KeyData('®'));
-		addStandAloneToBrailleMap(SECTION, new KeyData('§'));
-		addStandAloneToBrailleMap(TRADEMARK, new KeyData('™'));
-
 		// ASCII CHARACTERS. Stored under the negative of their keycode.
         addWhitespaceToBrailleMap(Integer.valueOf(-KeyEvent.VK_ENTER), KD_ENTER);
         //addWhitespaceToBrailleMap(Integer.valueOf(-KeyEvent.VK_SPACE), KD_SPACE);
@@ -1236,12 +1192,15 @@ public class TextAreaBraille extends JTextArea {
 	private static final KeyData KD_GPSI = new KeyData('Ψ');
 	private static final KeyData KD_GOMEGA = new KeyData('Ω');
 
-	// PUNCTUATION
+	// SYMBOLS
 	private static final KeyData KD_AT_SIGN = new KeyData('@', true);
+	private static final KeyData KD_CARET = new KeyData('^', true);
 	private static final KeyData KD_COMMA = new KeyData(',', KeyEvent.VK_COMMA);
 	private static final KeyData KD_FULLSTOP = new KeyData('.', KeyEvent.VK_PERIOD);
+	private static final KeyData KD_PERCENT = new KeyData('\u0025', 37);
 	private static final KeyData KD_PLUS = new KeyData('+', KeyEvent.VK_PLUS);
 	private static final KeyData KD_MINUS = new KeyData('-', KeyEvent.VK_MINUS);
+	private static final KeyData KD_NUMBER = new KeyData('#');
 	private static final KeyData KD_ASTERISK = new KeyData('*', KeyEvent.VK_ASTERISK);
 	private static final KeyData KD_FORWARD_SLASH = new KeyData('/', KeyEvent.VK_SLASH);
 	private static final KeyData KD_BACK_SLASH = new KeyData('\\', KeyEvent.VK_BACK_SLASH);
@@ -1249,7 +1208,10 @@ public class TextAreaBraille extends JTextArea {
 	private static final KeyData KD_LESS_THAN = new KeyData('<', true);
 	private static final KeyData KD_GREATER_THAN = new KeyData('>', true);
 	private static final KeyData KD_COLON = new KeyData(':', KeyEvent.VK_COLON, true);
+	private static final KeyData KD_SEMICOLON = new KeyData(';', KeyEvent.VK_SEMICOLON);
+	private static final KeyData KD_QUESTION_MARK = new KeyData('?');
 	private static final KeyData KD_QUOTE = new KeyData('"', true);
+	private static final KeyData KD_SECTION = new KeyData('§');
 
 	// NUMBERS
 	private static final KeyData KD_0 = new KeyData('0');
@@ -1327,7 +1289,9 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer Ax = 45;
 	private static final Integer Ay = 61;
 	private static final Integer Az = 53;
+
 	private static final LinkedHashMap<Integer, KeyData[][]> ALPHABET = new LinkedHashMap<Integer, KeyData[][]>();
+	private static final LinkedHashMap<Integer, KeyData> DIGITS = new LinkedHashMap<Integer, KeyData>();
 	static {
 		ALPHABET.put(Aa, link(KD_Aa, KD_AA));
 		ALPHABET.put(Ab, link(KD_Ab, KD_AB));
@@ -1355,6 +1319,17 @@ public class TextAreaBraille extends JTextArea {
 		ALPHABET.put(Ax, link(KD_Ax, KD_AX));
 		ALPHABET.put(Ay, link(KD_Ay, KD_AY));
 		ALPHABET.put(Az, link(KD_Az, KD_AZ));
+		DIGITS.put(Aa, KD_Aa);
+		DIGITS.put(Ab, KD_Ab);
+		DIGITS.put(Ac, KD_Ac);
+		DIGITS.put(Ad, KD_Ad);
+		DIGITS.put(Ae, KD_Ae);
+		DIGITS.put(Af, KD_Af);
+		DIGITS.put(Ag, KD_Ag);
+		DIGITS.put(Ah, KD_Ah);
+		DIGITS.put(Ai, KD_Ai);
+		DIGITS.put(Aj, KD_Aj);
+		DIGITS.put(SHIFT16, KD_SPACE);
 	}
 	private static final int LOWER = 0;
 	private static final int UPPER = 1;
@@ -1387,8 +1362,8 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer EN = 34;
 //	private static final Integer FF = EXCLAMATION;
 	private static final Integer GG = 54;
-	private static final Integer IN = 20;
-	private static final Integer WAS = 52;
+//	private static final Integer IN = 20;
+
 
 	// STRONG CONTRACTIONS
 	private static final Integer AND = 47;
@@ -1397,23 +1372,23 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer THE = 46;
 	private static final Integer WITH = 62;
 
-	private static final HashMap<Integer, String> GROUPSIGNS = new HashMap<Integer, String>();
+	private static final HashMap<Integer[], String> GROUPSIGNS = new HashMap<Integer[], String>();
 	static {
 		// Those not here are used for wordsigns.
-		GROUPSIGNS.put(GH, "gh");
-		GROUPSIGNS.put(ED, "ed");
-		GROUPSIGNS.put(ER, "er");
-		GROUPSIGNS.put(OW, "ow");
-		GROUPSIGNS.put(ING, "ing");
-		GROUPSIGNS.put(AR, "ar");
+		GROUPSIGNS.put(join(GH), "gh");
+		GROUPSIGNS.put(join(ED), "ed");
+		GROUPSIGNS.put(join(ER), "er");
+		GROUPSIGNS.put(join(OW), "ow");
+		GROUPSIGNS.put(join(ING), "ing");
+		GROUPSIGNS.put(join(AR), "ar");
 		// Actually contractions, but treat the same.
-		GROUPSIGNS.put(AND, "and");
-		GROUPSIGNS.put(FOR, "for");
-		GROUPSIGNS.put(OF, "of");
-		GROUPSIGNS.put(THE, "the");
-		GROUPSIGNS.put(WITH, "with");
+		GROUPSIGNS.put(join(AND), "and");
+		GROUPSIGNS.put(join(FOR), "for");
+		GROUPSIGNS.put(join(OF), "of");
+		GROUPSIGNS.put(join(THE), "the");
+		GROUPSIGNS.put(join(WITH), "with");
 	}
-/*
+
 	// STRONG WORDSIGNS
 	private static final Integer CHILD = CH;
 	private static final Integer SHALL = SH;
@@ -1422,14 +1397,16 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer OUT = OU;
 	private static final Integer STILL = ST;
 
+	private static final Integer QUESTION_MARK = 38;
+	private static final Integer SEMICOLON = 6;
 	// LOWER WORDSIGNS
-//	private static final Integer BE = SEMICOLON;
+	private static final Integer BE = SEMICOLON;
 	private static final Integer ENOUGH = EN;
 	private static final Integer WERE = GG;
-//	private static final Integer HIS = QUESTION_MARK;
-//	private static final Integer IN = IN;
+	private static final Integer HIS = QUESTION_MARK;
+	private static final Integer IN = 20;
 	private static final Integer WAS = 52;
-*/
+
 	private static final HashMap<Integer, String> WORDSIGNS = new HashMap<Integer, String>();
 	static {
 		WORDSIGNS.put(CH, "ch");
@@ -1438,8 +1415,10 @@ public class TextAreaBraille extends JTextArea {
 		WORDSIGNS.put(WH, "wh");
 		WORDSIGNS.put(OU, "ou");
 		WORDSIGNS.put(ST, "st");
+		WORDSIGNS.put(BE, ";");
 		WORDSIGNS.put(EN, "en");
 		WORDSIGNS.put(GG, "gg");
+		WORDSIGNS.put(HIS, "?");
 		WORDSIGNS.put(IN, "in");
 		WORDSIGNS.put(WAS, "ea");
 	}
@@ -1452,9 +1431,9 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer FULLSTOP = 50;
 	private static final Integer HYPHEN = 36;
 //	private static final Integer PRIME = GG;
-	private static final Integer QUESTION_MARK = 38;
+//	private static final Integer QUESTION_MARK = 38;
 //	private static final Integer QUESTION_MARK_INVERTED = WAS;
-	private static final Integer SEMICOLON = 6;
+//	private static final Integer SEMICOLON = 6;
 	private static final HashMap<Integer[], KeyData> STANDALONES = new HashMap<Integer[], KeyData>();
 	static {
 		STANDALONES.put(join(APOSTROPHE), new KeyData('\''));
@@ -1463,7 +1442,11 @@ public class TextAreaBraille extends JTextArea {
 		STANDALONES.put(join(EXCLAMATION), new KeyData('!', KeyEvent.VK_EXCLAMATION_MARK, true));
 		STANDALONES.put(join(FULLSTOP), KD_FULLSTOP);
 		STANDALONES.put(join(HYPHEN), KD_MINUS);
-		STANDALONES.put(join(SEMICOLON), new KeyData(';', KeyEvent.VK_SEMICOLON));
+		DIGITS.put(COLON, KD_COLON);
+		DIGITS.put(COMMA, KD_COMMA);
+		DIGITS.put(EXCLAMATION, KD_PLUS);
+		DIGITS.put(FULLSTOP, KD_FULLSTOP);
+		DIGITS.put(HYPHEN, KD_MINUS);
 	}
 
 	// LIGATURES
@@ -1509,40 +1492,67 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer[] ROUND_BRACKET_CLOSE = join(SHIFT16, GROUP_CLOSE);
 	private static final Integer[] SQUARE_BRACKET_OPEN = join(SHIFT40, GROUP_OPEN);
 	private static final Integer[] SQUARE_BRACKET_CLOSE = join(SHIFT40, GROUP_CLOSE);
+	static {
+		STANDALONES.put(ANGLE_BRACKET_OPEN, KD_LESS_THAN);
+		STANDALONES.put(ANGLE_BRACKET_CLOSE, KD_GREATER_THAN);
+		STANDALONES.put(CURLY_BRACKET_OPEN, new KeyData('{', true));
+		STANDALONES.put(CURLY_BRACKET_CLOSE, new KeyData('}', true));
+		STANDALONES.put(ROUND_BRACKET_OPEN, new KeyData('(', true));
+		STANDALONES.put(ROUND_BRACKET_CLOSE, new KeyData(')', true));
+		STANDALONES.put(SQUARE_BRACKET_OPEN, new KeyData('['));
+		STANDALONES.put(SQUARE_BRACKET_CLOSE, new KeyData(']'));
+	}
 
-	// SHIFT 8 / CURRENCY
+	// SHIFT 8
 	private static final Integer[] AMPERSAND = join(SHIFT8, AND);
 	private static final Integer[] AT_SIGN = join(SHIFT8, Aa);
 	private static final Integer[] CARET = join(SHIFT8, EN);
+	//private static final Integer[] GRREATER_THAN = ANGLE_BRACKET_CLOSE;
+	//private static final Integer[] LESS_THAN = ANGLE_BRACKET_OPEN;
+	private static final Integer[] TILDE = join(SHIFT8, IN);
+	// SHIFT 8 - CURRENCY
 	private static final Integer[] CENT = join(SHIFT8, Ac);
 	private static final Integer[] DOLLAR = join(SHIFT8, As);
 	private static final Integer[] EURO = join(SHIFT8, Ae);
 	private static final Integer[] FRANC = join(SHIFT8, Af);
 	private static final Integer[] GBP = join(SHIFT8, Al);
-	//private static final Integer[] GRREATER_THAN = ANGLE_BRACKET_CLOSE;
-	//private static final Integer[] LESS_THAN = ANGLE_BRACKET_OPEN;
 	private static final Integer[] NAIRA = join(SHIFT8, An);
-	private static final Integer[] TILDE = join(SHIFT8, 20);
 	private static final Integer[] YEN = join(SHIFT8, Ay);
 	// SHIFT 8 - COMBINING CHARACTERS
 	private static final Integer[] BREVE = join(SHIFT8, ING);
 	private static final Integer[] MACRON = join(SHIFT8, HYPHEN);
 	private static final Integer[] SOLIDUS = join(SHIFT8, CH);
 	private static final Integer[] STRIKETHROUGH = join(SHIFT8, COLON);
-	// SHIFT 8 - CONTRACTIONS: THESE SHOULD BE SHIFT 48 but that's GRADE 1 which would make them unusable.
-	private static final Integer[] ENCE = join(SHIFT8, Ae);
-	private static final Integer[] ONG = join(SHIFT8, Ag);
-	private static final Integer[] FUL = join(SHIFT8, Al);
-	private static final Integer[] TION = join(SHIFT8, An);
-	private static final Integer[] NESS = join(SHIFT8, As);
-	private static final Integer[] MENT = join(SHIFT8, At);
-	private static final Integer[] ITY = join(SHIFT8, Ay);
 	// SHIFT 8 -> SHIFT 32
 	private static final Integer[] DAGGER = join(SHIFT8_32, TH);
 	private static final Integer[] DOUBLE_DAGGER = join(SHIFT8_32, ER);
 
+	private static final HashMap<Integer[], KeyData[]> MODIFIERS = new HashMap<Integer[], KeyData[]>();
+	static {
+		CHARACTERS.put(AMPERSAND, new KeyData('&', true));
+		CHARACTERS.put(AT_SIGN, KD_AT_SIGN);
+		CHARACTERS.put(CARET, KD_CARET);
+		CHARACTERS.put(TILDE, new KeyData('~', true));
+		// CURRENCIES
+		CHARACTERS.put(CENT, new KeyData('¢'));
+		CHARACTERS.put(DOLLAR, new KeyData('$', KeyEvent.VK_DOLLAR, true));
+		CHARACTERS.put(EURO, new KeyData('€'));
+		CHARACTERS.put(FRANC, new KeyData('₣'));
+		CHARACTERS.put(GBP, new KeyData('£', true));
+		CHARACTERS.put(NAIRA, new KeyData('₦'));
+		CHARACTERS.put(YEN, new KeyData('¥'));
+		// COMBINING CHARACTERS
+		MODIFIERS.put(BREVE, join(KD_BREVE));
+		MODIFIERS.put(MACRON, join(KD_MACRON));
+		MODIFIERS.put(SOLIDUS, join(KD_SOLIDUS));
+		MODIFIERS.put(STRIKETHROUGH, join(KD_STRIKETHROUGH));
+		// DAGGERS - Gennerally used for end of word references
+		STANDALONES.put(DAGGER, new KeyData('†'));
+		STANDALONES.put(DOUBLE_DAGGER, new KeyData('‡'));
+	}
+
 	// SHIFT 16 - MATHS
-	private static final Integer[] ASTERISK = join(SHIFT16, 20);
+	private static final Integer[] ASTERISK = join(SHIFT16, IN);
 	private static final Integer[] DITTO = join(SHIFT16, 2);
 	private static final Integer[] DIVIDE = join(SHIFT16, ST);
 	private static final Integer[] EQUALS = join(SHIFT16, GG);
@@ -1572,6 +1582,40 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer[] WHERE = join(SHIFT16, WH);
 	private static final Integer[] OUGHT = join(SHIFT16, OU);
 	private static final Integer[] WORK = join(SHIFT16, Aw);
+	static {
+		CHARACTERS.put(ASTERISK, KD_ASTERISK);
+		CHARACTERS.put(DITTO, KD_QUOTE);
+		CHARACTERS.put(DIVIDE, KD_QUOTE);
+		CHARACTERS.put(EQUALS, KD_QUOTE);
+		CHARACTERS.put(MINUS, KD_QUOTE);
+		CHARACTERS.put(MULTIPLY, KD_QUOTE);
+		CHARACTERS.put(PLUS, KD_QUOTE);
+		DIGITS.put(IN, KD_ASTERISK);
+		DIGITS.put(GG, KD_EQUALS);
+		// CONTRACTIONS
+		GROUPSIGNS.put(DAY, "day");
+		GROUPSIGNS.put(EVER, "ever");
+		GROUPSIGNS.put(FATHER, "father");
+		GROUPSIGNS.put(HERE, "here");
+		GROUPSIGNS.put(KNOW, "know");
+		GROUPSIGNS.put(LORD, "lord");
+		GROUPSIGNS.put(MOTHER, "mother");
+		GROUPSIGNS.put(NAME, "name");
+		GROUPSIGNS.put(ONE, "one");
+		GROUPSIGNS.put(PART, "part");
+		GROUPSIGNS.put(QUESTION, "question");
+		GROUPSIGNS.put(RIGHT, "right");
+		GROUPSIGNS.put(SOME, "some");
+		GROUPSIGNS.put(TIME, "time");
+		GROUPSIGNS.put(UNDER, "under");
+		GROUPSIGNS.put(YOUNG, "young");
+		GROUPSIGNS.put(THERE, "there");
+		GROUPSIGNS.put(CHARACTER, "character");
+		GROUPSIGNS.put(THROUGH, "through");
+		GROUPSIGNS.put(WHERE, "where");
+		GROUPSIGNS.put(OUGHT, "ought");
+		GROUPSIGNS.put(WORK, "work");
+	}
 
 	// SHIFT 24
 	private static final Integer[] COPYRIGHT = join(SHIFT24, Ac);
@@ -1602,16 +1646,77 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer[] WHOSE = join(SHIFT24, WH);
 	private static final Integer[] WORD = join(SHIFT24, Aw);
 
+	private static final HashMap<Integer[], KeyData[][]> PHONETICS = new HashMap<Integer[], KeyData[][]>();
+	static {
+		CHARACTERS.put(COPYRIGHT, new KeyData('©'));
+		CHARACTERS.put(DEGREES, new KeyData('°'));
+		CHARACTERS.put(PARAGRAPH, new KeyData('¶'));
+		STANDALONES.put(QUOTE_OPEN, new KeyData('“'));
+		STANDALONES.put(QUOTE_CLOSE, new KeyData('”'));
+		CHARACTERS.put(REGISTERED, new KeyData('®'));
+		CHARACTERS.put(SECTION, KD_SECTION);
+		CHARACTERS.put(TRADEMARK, new KeyData('™'));
+		CHARACTERS.put(FEMALE, new KeyData('♀'));
+		CHARACTERS.put(MALE, new KeyData('♂'));
+		PHONETICS.put(ENG, link(new KeyData('ŋ', 331), new KeyData('Ŋ', 330)));
+		DIGITS.put(As, KD_SECTION);
+		// COMBINING
+		MODIFIERS.put(ACUTE, join(KD_ACUTE));
+		MODIFIERS.put(CARON, join(KD_CARON));
+		MODIFIERS.put(CEDILLA, join(KD_CEDILLA));
+		MODIFIERS.put(CIRCUMFLEX, join(KD_CIRCUMFLEX));
+		MODIFIERS.put(DIAERESIS, join(KD_DIAERESIS));
+		MODIFIERS.put(GRAVE, join(KD_GRAVE));
+		MODIFIERS.put(RING, join(KD_RING));
+		MODIFIERS.put(TILDE_COMB, join(KD_TILDE_COMB));
+		// GROUPSIGNS
+		GROUPSIGNS.put(UPON, "upon");
+		GROUPSIGNS.put(THESE, "these");
+		GROUPSIGNS.put(THOSE, "those");
+		GROUPSIGNS.put(WHOSE, "whose");
+		GROUPSIGNS.put(WORD, "word");
+	}
+
 	// SHIFT 40
 	private static final Integer[] PERCENT = join(SHIFT40, WAS);
 	private static final Integer[] UNDERSCORE = join(SHIFT40, HYPHEN);
 	// SHIFT 40 - CONTRACTIONS
 	private static final Integer[] OUND = join(SHIFT40, Ad);
 	private static final Integer[] ANCE = join(SHIFT40, Ae);
+	private static final Integer[] SELF = join(SHIFT40, Af); // CUSTOM
 	private static final Integer[] SION = join(SHIFT40, An);
 	private static final Integer[] LESS = join(SHIFT40, As);
 	private static final Integer[] OUNT = join(SHIFT40, At);
+	static {
+		CHARACTERS.put(PERCENT, KD_PERCENT);
+		CHARACTERS.put(UNDERSCORE, new KeyData('_', KeyEvent.VK_UNDERSCORE, true));
+		DIGITS.put(WAS, KD_PERCENT);
+		// CONTRACTIONS
+		GROUPSIGNS.put(OUND, "ound");
+		GROUPSIGNS.put(ANCE, "ance");
+		GROUPSIGNS.put(SELF, "self"); // CUSTOM
+		GROUPSIGNS.put(SION, "sion");
+		GROUPSIGNS.put(LESS, "less");
+		GROUPSIGNS.put(OUNT, "ount");
+	}
 
+	// SHIFT 48 (GRADE 1)
+	private static final Integer[] ENCE = join(SHIFT48, Ae);
+	private static final Integer[] ONG = join(SHIFT48, Ag);
+	private static final Integer[] FUL = join(SHIFT48, Al);
+	private static final Integer[] TION = join(SHIFT48, An);
+	private static final Integer[] NESS = join(SHIFT48, As);
+	private static final Integer[] MENT = join(SHIFT48, At);
+	private static final Integer[] ITY = join(SHIFT48, Ay);
+	static {
+		GROUPSIGNS.put(ENCE, "ence");
+		GROUPSIGNS.put(ONG, "ong");
+		GROUPSIGNS.put(FUL, "ful");
+		GROUPSIGNS.put(TION, "tion");
+		GROUPSIGNS.put(NESS, "ness");
+		GROUPSIGNS.put(MENT, "ment");
+		GROUPSIGNS.put(ITY, "ity");
+	}
 
 	// SHIFT 56
 	private static final Integer[] ANGLE_QUOTE_OPEN = join(SHIFT56, QUESTION_MARK);
@@ -1628,22 +1733,24 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer[] SPIRIT = join(SHIFT56, As);
 	private static final Integer[] THEIR = join(SHIFT56, THE);
 	private static final Integer[] WORLD = join(SHIFT56, Aw);
-
-
-	private static final HashMap<Integer[], KeyData[]> MODIFIERS = new HashMap<Integer[], KeyData[]>();
 	static {
-		MODIFIERS.put(ACUTE, join(KD_ACUTE));
-		MODIFIERS.put(BREVE, join(KD_BREVE));
-		MODIFIERS.put(CARON, join(KD_CARON));
-		MODIFIERS.put(CEDILLA, join(KD_CEDILLA));
-		MODIFIERS.put(CIRCUMFLEX, join(KD_CIRCUMFLEX));
-		MODIFIERS.put(DIAERESIS, join(KD_DIAERESIS));
-		MODIFIERS.put(GRAVE, join(KD_GRAVE));
-		MODIFIERS.put(MACRON, join(KD_MACRON));
-		MODIFIERS.put(RING, join(KD_RING));
-		MODIFIERS.put(SOLIDUS, join(KD_SOLIDUS));
-		MODIFIERS.put(STRIKETHROUGH, join(KD_STRIKETHROUGH));
-		MODIFIERS.put(TILDE_COMB, join(KD_TILDE_COMB));
+		STANDALONES.put(ANGLE_QUOTE_OPEN, new KeyData('«'));
+		STANDALONES.put(ANGLE_QUOTE_CLOSE, new KeyData('»'));
+		STANDALONES.put(BACK_SLASH, KD_BACK_SLASH);
+		STANDALONES.put(BULLET, new KeyData('•'));
+		STANDALONES.put(FORWARD_SLASH, KD_FORWARD_SLASH);
+		STANDALONES.put(NUMBER, KD_NUMBER);
+		PHONETICS.put(SCHWA, link(new KeyData('ə', 601), new KeyData('Ə', 399)));
+		DIGITS.put(CH, KD_BACK_SLASH);
+		DIGITS.put(ST, KD_FORWARD_SLASH);
+		DIGITS.put(TH, KD_NUMBER);
+		// CONTRACTIONS
+		GROUPSIGNS.put(CANNOT, "cannot");
+		GROUPSIGNS.put(HAD, "had");
+		GROUPSIGNS.put(MANY, "many");
+		GROUPSIGNS.put(SPIRIT, "spirit");
+		GROUPSIGNS.put(THEIR, "their");
+		GROUPSIGNS.put(WORLD, "world");
 	}
 
 	// GREEK ALPHABET
@@ -1723,10 +1830,41 @@ public class TextAreaBraille extends JTextArea {
 		DEFAULT_ALPHABETIC_WORDSIGNS.put("wh", "which");
 		DEFAULT_ALPHABETIC_WORDSIGNS.put("ou", "out");
 		DEFAULT_ALPHABETIC_WORDSIGNS.put("st", "still");
+		DEFAULT_ALPHABETIC_WORDSIGNS.put(";", "be");
 		DEFAULT_ALPHABETIC_WORDSIGNS.put("en", "enough");
 		DEFAULT_ALPHABETIC_WORDSIGNS.put("gg", "were");
+		DEFAULT_ALPHABETIC_WORDSIGNS.put("?", "his");
 		DEFAULT_ALPHABETIC_WORDSIGNS.put("in", "in");
-		DEFAULT_ALPHABETIC_WORDSIGNS.put("was", "was");
+		DEFAULT_ALPHABETIC_WORDSIGNS.put("ea", "was");
+	}
+
+	private static final String[] ASTRONOMY_LOWER = {
+		"asteroid", "blue", "carbon", "dwarf", "exo", "fusion", "gravity", "hydrogen", "infrared", "jet", "dark", "light", "meteor",
+		"neutron", "orbit", "planet", "quasar", "red", "space", "time", "ultraviolet", "vacuum", "wavelength", "x-ray", "yellow", "black hole"
+	};
+	private static final HashMap<String, String> ASTRONOMY_ALPHABETIC_WORDSIGNS = new HashMap<String, String>();
+	static {
+		ASTRONOMY_ALPHABETIC_WORDSIGNS.put("name", "astronomy");
+		ASTRONOMY_ALPHABETIC_WORDSIGNS.put("upperFromLower", "true");
+		int index = 0;
+		for (KeyData[][] kd: ALPHABET.values()) {  //LinkedList, so ordered
+			if (ASTRONOMY_LOWER[index] != "") {
+				ASTRONOMY_ALPHABETIC_WORDSIGNS.put(String.valueOf(kd[LOWER][0].keyChar), DEFAULT_LOWER[index]);
+			}
+			index++;
+		}
+		ASTRONOMY_ALPHABETIC_WORDSIGNS.put("ch", "nebula");
+		ASTRONOMY_ALPHABETIC_WORDSIGNS.put("sh", "satellite");
+		ASTRONOMY_ALPHABETIC_WORDSIGNS.put("th", "galaxy");
+		ASTRONOMY_ALPHABETIC_WORDSIGNS.put("wh", "matter");
+		ASTRONOMY_ALPHABETIC_WORDSIGNS.put("ou", "outer");
+		ASTRONOMY_ALPHABETIC_WORDSIGNS.put("st", "star");
+		ASTRONOMY_ALPHABETIC_WORDSIGNS.put(";", "radio");
+		ASTRONOMY_ALPHABETIC_WORDSIGNS.put("en", "energy");
+		ASTRONOMY_ALPHABETIC_WORDSIGNS.put("gg", "giant");
+		ASTRONOMY_ALPHABETIC_WORDSIGNS.put("?", "helium");
+		ASTRONOMY_ALPHABETIC_WORDSIGNS.put("in", "inner");
+		ASTRONOMY_ALPHABETIC_WORDSIGNS.put("ea", "atmosphere");
 	}
 
 	private static final String[] GENEALOGY_ALPHABETIC_WORDSIGNS = {
@@ -1777,7 +1915,11 @@ public class TextAreaBraille extends JTextArea {
 	static {
 		populateBrailleMap();
 		populateAlphabeticWordsignsAndGroupSigns();
+		addAlphabetsToBrailleMap();
+		addDigitsToBrailleMap();
 		addStandAlonesToBrailleMap();
 		addCharsToBrailleMap();
+		addCombiningCharsToBrailleMap();
+		addLigaturesToBrailleMap();
 	}
 }
