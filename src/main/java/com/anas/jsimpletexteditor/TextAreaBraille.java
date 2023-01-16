@@ -508,7 +508,7 @@ public class TextAreaBraille extends JTextArea {
 						}
 					}
 					return result;
-				}
+				} // else // CHARACTER, STRING, none of which can't be modified.
 
 				if (md.isStandAloneMarker() &&
 					recentHistory.getFirst().mapData.isStandAloneMarker() &&
@@ -533,10 +533,12 @@ public class TextAreaBraille extends JTextArea {
 							}
 						}
 						if (result.keyData.get(0) != null) {
+							// In case of ; or ? which are also standalones.
+							recentHistory.getLast().mapData = result;
 							this.sendKeyEvents(e.getComponent(), e.getWhen(), result.keyData.get(0));
 						}
 					}
-				} // else // CHARACTER, STRING, none of which can't be modified.
+				}
 
 				// The SHIFT 48 Groupsigns when not blocking an alphabetic contraction,
 
