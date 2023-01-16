@@ -210,6 +210,7 @@ public class TextAreaBraille extends JTextArea {
 			case KeyEvent.VK_ENTER:
 			case KeyEvent.VK_SPACE:
 			case KeyEvent.VK_BACK_SPACE:
+			case KeyEvent.VK_TAB:
 				lastKeyDown = true;
 				return;
 		}
@@ -234,7 +235,8 @@ public class TextAreaBraille extends JTextArea {
 				break;
 
 			case KeyEvent.VK_BACK_SPACE:
-				sendKeyEvents(e.getComponent(), e. getWhen(), BRAILLE_MAP.get(-keyCode).getKeyData());
+			case KeyEvent.VK_TAB:
+				sendKeyEvents(e.getComponent(), e.getWhen(), BRAILLE_MAP.get(-keyCode).getKeyData());
 				updateRecentHistory(BRAILLE_MAP.get(-keyCode), BRAILLE_MAP.get(-keyCode).getKeyData());
 				wordResets();
 				currentPinCodesList.clear();
@@ -1053,6 +1055,7 @@ public class TextAreaBraille extends JTextArea {
 	private static final KeyData KD_BACKSPACE = new KeyData('\b', KeyEvent.VK_BACK_SPACE);
 	private static final KeyData KD_ENTER = new KeyData('\n', KeyEvent.VK_ENTER);
 	private static final KeyData KD_SPACE = new KeyData(' ', KeyEvent.VK_SPACE);
+	private static final KeyData KD_TAB = new KeyData('\t', KeyEvent.VK_TAB);
 
 	// STANDARD ALPHABET KEYDATA
 	private static final KeyData KD_Aa = new KeyData('a');
@@ -1244,6 +1247,7 @@ public class TextAreaBraille extends JTextArea {
 	// SPECIAL
 	private static final Integer ENTER = 128;
 	private static final Integer ENTER_RAW = Integer.valueOf(-KeyEvent.VK_ENTER);
+	private static final Integer TAB_RAW = Integer.valueOf(-KeyEvent.VK_TAB);
 	private static final Integer[] SHIFT8_32 = join(SHIFT8, SHIFT32);
 	private static final Integer SPACE = -KeyEvent.VK_SPACE;
 	private static final Integer GROUP_OPEN = 35;
@@ -1253,6 +1257,7 @@ public class TextAreaBraille extends JTextArea {
 		WHITESPACES.put(ENTER, KD_ENTER);
 		WHITESPACES.put(ENTER_RAW, KD_ENTER);
 		WHITESPACES.put(SPACE, KD_SPACE);
+		WHITESPACES.put(TAB_RAW, KD_TAB);
 	}
 
 	// LETTERS
