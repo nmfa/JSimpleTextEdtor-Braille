@@ -391,10 +391,7 @@ public class TextAreaBraille extends JTextArea {
 	}
 
 	private boolean isWhitespace(int pinCode) {
-		for (int code: WHITESPACES) {
-			if (pinCode == code) return true;
-		}
-		return false;
+		return WHITESPACES.keySet().contains(pinCode);
 	}
 
 
@@ -660,9 +657,10 @@ public class TextAreaBraille extends JTextArea {
 		addToBrailleMap(pinCodes, MapData.CHARACTER | MapData.STANDALONE, keyData, null);
 	}
 
-	private static void addWhitespaceToBrailleMap(Integer pinCode, KeyData... keyData) {
-		Integer[] pinCodes = {pinCode};
-		addToBrailleMap(pinCodes, MapData.WHITESPACE | MapData.STANDALONE, keyData, null);
+	private static void addWhitespacesToBrailleMap() {
+		for (Integer code: WHITESPACES.keySet()) {
+			addToBrailleMap(join(code), MapData.WHITESPACE | MapData.STANDALONE, WHITESPACES.get(code), null);
+		}
 	}
 
 	private static void addLigaturesToBrailleMap() {
@@ -1026,25 +1024,12 @@ public class TextAreaBraille extends JTextArea {
 		// ENGLISH ALPHABET
 		addToBrailleMap(LIGATURE, MapData.LIGATURE | MapData.OVERFLOWS, KD_LIGATURE, null);
 
-		addWhitespaceToBrailleMap(ENTER, KD_ENTER);
-		addWhitespaceToBrailleMap(SPACE, KD_SPACE);
- 	
 		// NUMBERS
 		addCharToBrailleMap(join(DIGIT, EN), KD_CARET);
 		addCharToBrailleMap(join(DIGIT, GROUP_OPEN), KD_LESS_THAN);
 		addCharToBrailleMap(join(DIGIT, GROUP_CLOSE), KD_GREATER_THAN);
 
-		// MATHS
-		addCharToBrailleMap(ASTERISK, KD_ASTERISK);
-		addCharToBrailleMap(DITTO, new KeyData('"', true));
-		addCharToBrailleMap(DIVIDE, new KeyData('÷'));
-		addCharToBrailleMap(EQUALS, KD_EQUALS);
-		addCharToBrailleMap(MINUS, KD_MINUS);
-		addCharToBrailleMap(MULTIPLY, new KeyData('×'));
-		addCharToBrailleMap(PLUS, KD_PLUS);
-	
 		// ASCII CHARACTERS. Stored under the negative of their keycode.
-        addWhitespaceToBrailleMap(Integer.valueOf(-KeyEvent.VK_ENTER), KD_ENTER);
         //addWhitespaceToBrailleMap(Integer.valueOf(-KeyEvent.VK_SPACE), KD_SPACE);
     	addCharToBrailleMap(BACKSPACE, KD_BACKSPACE);
 	}
@@ -1052,14 +1037,14 @@ public class TextAreaBraille extends JTextArea {
 	private static final HashMap<Integer, Integer> KEY_PIN_MAP = new HashMap<Integer, Integer>();
 	static {
 		// MAP REAL KEYBOARD TO PINS
-        KEY_PIN_MAP.put(70, 1);   // F
-        KEY_PIN_MAP.put(68, 2);   // D
-        KEY_PIN_MAP.put(83, 4);   // S
-        KEY_PIN_MAP.put(74, 8);   // J
-        KEY_PIN_MAP.put(75, 16);  // K
-        KEY_PIN_MAP.put(76, 32);  // L
-        KEY_PIN_MAP.put(65, 64);  // A
-        KEY_PIN_MAP.put(59, 128); // ;
+        KEY_PIN_MAP.put(70, 1);   // F - 1
+        KEY_PIN_MAP.put(68, 2);   // D - 2
+        KEY_PIN_MAP.put(83, 4);   // S - 3
+        KEY_PIN_MAP.put(74, 8);   // J - 4
+        KEY_PIN_MAP.put(75, 16);  // K - 5
+        KEY_PIN_MAP.put(76, 32);  // L - 6
+        KEY_PIN_MAP.put(65, 64);  // A - 7
+        KEY_PIN_MAP.put(59, 128); // ; - 8
     }
 
 	private static final Integer BACKSPACE = -KeyEvent.VK_BACK_SPACE;
@@ -1258,11 +1243,17 @@ public class TextAreaBraille extends JTextArea {
 	// PINCODES
 	// SPECIAL
 	private static final Integer ENTER = 128;
+	private static final Integer ENTER_RAW = Integer.valueOf(-KeyEvent.VK_ENTER);
 	private static final Integer[] SHIFT8_32 = join(SHIFT8, SHIFT32);
 	private static final Integer SPACE = -KeyEvent.VK_SPACE;
-	private static final Integer[] WHITESPACES = join(SPACE, ENTER);  // Ordered by most used.
 	private static final Integer GROUP_OPEN = 35;
 	private static final Integer GROUP_CLOSE = 28;
+	private static final HashMap<Integer, KeyData> WHITESPACES = new HashMap<Integer, KeyData>();
+	static {
+		WHITESPACES.put(ENTER, KD_ENTER);
+		WHITESPACES.put(ENTER_RAW, KD_ENTER);
+		WHITESPACES.put(SPACE, KD_SPACE);
+	}
 
 	// LETTERS
 	private static final Integer Aa = 1;
@@ -1917,6 +1908,7 @@ public class TextAreaBraille extends JTextArea {
 	static {
 		populateBrailleMap();
 		populateAlphabeticWordsignsAndGroupSigns();
+		addWhitespacesToBrailleMap();
 		addAlphabetsToBrailleMap();
 		addDigitsToBrailleMap();
 		addStandAlonesToBrailleMap();
