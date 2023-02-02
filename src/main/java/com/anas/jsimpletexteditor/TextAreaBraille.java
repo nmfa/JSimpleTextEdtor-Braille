@@ -173,7 +173,6 @@ public class TextAreaBraille extends JTextArea {
     private boolean lastKeyDown = false;
 	private ArrayDeque<History> recentHistory = new ArrayDeque<History>(2);
 	private String currentWordContractions = "default";
-	private int wordLength = 0;
 	private LOCK grade1 = LOCK.OFF; // Only in use to block alphabetic wordsigns. On or Off only.
 	private LOCK shift = LOCK.OFF;
 	private LOCK shift40 = LOCK.OFF;
@@ -194,9 +193,12 @@ public class TextAreaBraille extends JTextArea {
 		if (e.getID() == KeyEvent.KEY_PRESSED) {
 			onKeyDown(e);
         } else if (e.getID() == KeyEvent.KEY_RELEASED) {
-			log.info("PROCESSING EVENT: " + currentPinCode + ", " + currentPinCodesList.toString() + ", " + KEY_PIN_MAP.getOrDefault(e.getKeyCode(), 0));
+			boolean lkd = lastKeyDown;
+			if (lkd) {
+				log.info("PROCESSING EVENT: " + currentPinCode + ", " + currentPinCodesList.toString() + ", " + KEY_PIN_MAP.getOrDefault(e.getKeyCode(), 0));
+			}
 			onKeyUp(e);
-			log.info("PROCESSED: " + currentPinCode + ", " + currentPinCodesList.toString() + ", " + shift);
+			if (lkd) log.info("PROCESSED: " + currentPinCode + ", " + currentPinCodesList.toString() + ", " + shift);
 		} else {
             // Ignore
         }
@@ -260,20 +262,16 @@ public class TextAreaBraille extends JTextArea {
 				} else if (currentPinCode == SHIFT) {
 					shift = shift.next();
 					// Doesn't reset other shifts
-					digit = digit.reset();
 					log.info("SHIFT: " + shift);
 				} else if (currentPinCode == SHIFT40) {
 					shift40 = shift40.next();
 					// Doesn't reset other shifts
-					digit = digit.reset();
 					log.info("SHIFT40: " + shift40);
 					popQualifiers();
 					qualifyPinCode();
-					} else if (currentPinCode == DIGIT) {
+				} else if (currentPinCode == DIGIT) {
 					digit = digit.next();
 					// Resets both shifts.
-					shift = shift.reset();
-					shift40 = shift40.reset();
 					log.info("DIGIT: " + digit);
 					popQualifiers();
 					qualifyPinCode();
@@ -314,14 +312,9 @@ public class TextAreaBraille extends JTextArea {
 					ArrayList<KeyData> kd = md.getKeyData(shift.isOn());
 					sendKeyEvents(e.getComponent(), e.getWhen(), kd);
 					updateRecentHistory(md, kd);
-					wordLength++;
 				} else if (md.isFinal()) {
 					ArrayList<KeyData> kd = md.getKeyData();
 					sendKeyEvents(e.getComponent(), e.getWhen(), kd);
-					// This will not be quite accurate for many modified letters,
-					// but they can't be part of contractions, and that is the purpose
-					// of wordLength.
-					wordLength += md.keyData.size();
 					updateRecentHistory(md, kd);
 				}
 			}
@@ -334,7 +327,6 @@ public class TextAreaBraille extends JTextArea {
 			// Deal with word locks of shift and digit
 			if (md.isWhitespace()) {
 				wordResets();
-				wordLength = 0;
 			}
 
 			//if (pinCodeOverflow == 0) {
@@ -372,8 +364,14 @@ public class TextAreaBraille extends JTextArea {
 		// GRADE1 and SHIFT are operating just off the class variable.
 		// SHIFT40 and DIGIT are used as part of the mappings currently,
 		// so for ease need to be part of the pin code array.
-		if (shift40.isOn()) currentPinCodesList.add(SHIFT40);
 		if (digit.isOn()) currentPinCodesList.add(DIGIT);
+		if (shift40.isOn()) {
+			currentPinCodesList.add(SHIFT40);
+			// GREKK requires DIGIT + SHIFT40 or double SHIFT4O
+			if (!shift40.isSymbol() && digit.isOff()) {
+				currentPinCodesList.add(SHIFT40);
+			}
+		}
 	}
 
 	private void updateRecentHistory(MapData md, ArrayList<KeyData> kd) {
@@ -448,13 +446,21 @@ public class TextAreaBraille extends JTextArea {
 				}
 
 				if (md.isString()) {
+					log.info("PARSE IS STRING");
 					MapData result = md;
+					int type = md.type & ~MapData.ALPHABET;
 					if (shift.isOff()) {
-						result = new MapData(md.type, md.keyData.get(LOWER), null);
+						result = new MapData(type, md.keyData.get(LOWER), null);
 					} else if (shift.isSymbol()) {
-						result = new MapData(md.type, md.keyData.get(UPPER_WITH_LOWER), null);
+						result = new MapData(type, md.keyData.get(UPPER_WITH_LOWER), null);
 					} else {
-						result = new MapData(md.type, md.keyData.get(UPPER), null);
+						result = new MapData(type, md.keyData.get(UPPER), null);
+					}
+					// We may need to substitute.
+					if (md.isWordSign() && md.keyData.size() == 5) {
+						result.keyData.add(null);
+						result.keyData.add(md.keyData.get(SUB_LOWER));
+						result.keyData.add(md.keyData.get(SUB_UPPER));
 					}
 					return result;
 				}
@@ -516,25 +522,39 @@ public class TextAreaBraille extends JTextArea {
 					!grade1.isOn()) {
 					MapData result = md;
 					// Should be a single pin code.
-					Integer prevPinCode = recentHistory.getLast().pinCodeList.get(0);
-					MapData asMapData = ALPHABETIC_WORDSIGNS.get(currentWordContractions).get(prevPinCode);
-					// Ensure a contraction is defined.
-					if (asMapData != null) { 
-						if (!asMapData.isSubstitution()) {
-							result = new MapData(MapData.STRING, asMapData.keyData.get((shift.isOn()) ? UPPER : LOWER), null);
+					History last = recentHistory.getLast();
+					Integer prevPinCode = last.pinCodeList.get(0);
+					if (prevPinCode == SHIFT40) {
+						// The annoying overloaded Greek alphabet/end signs.
+						log.info("SHIFT40 WORDSIGN: " + last.mapData.keyData.size() + ", " + last.mapData.keyData.get(0).size());
+						if (recentHistory.getLast().shift) {
+							result = new MapData(MapData.STRING, last.mapData.keyData.get(SUB_UPPER), null);
 						} else {
-							if (recentHistory.getLast().shift == shift.isOn()) {
-								result = new MapData(MapData.STRING, asMapData.keyData.get((shift.isOn()) ? UPPER : LOWER), null);
-							} else if (shift.isOn()) {
-								result = new MapData(MapData.STRING, asMapData.keyData.get(LOWER_WITH_UPPER), null);
-							} else {
-								result = new MapData(MapData.STRING, asMapData.keyData.get(UPPER_WITH_LOWER), null);
-							}
+							result = new MapData(MapData.STRING, last.mapData.keyData.get(SUB_LOWER), null);
 						}
-						if (result.keyData.get(0) != null) {
-							// In case of ; or ? which are also standalones.
-							recentHistory.getLast().mapData = result;
-							this.sendKeyEvents(e.getComponent(), e.getWhen(), result.keyData.get(0));
+						recentHistory.getLast().mapData = result;
+						this.sendKeyEvents(e.getComponent(), e.getWhen(), result.keyData.get(0));
+					} else {
+						// The normal single code wordsigns.
+						MapData asMapData = ALPHABETIC_WORDSIGNS.get(currentWordContractions).get(prevPinCode);
+						// Ensure a contraction is defined.
+						if (asMapData != null) { 
+							if (!asMapData.isSubstitution()) {
+								result = new MapData(MapData.STRING, asMapData.keyData.get((shift.isOn()) ? UPPER : LOWER), null);
+							} else {
+								if (recentHistory.getLast().shift == shift.isOn()) {
+									result = new MapData(MapData.STRING, asMapData.keyData.get((shift.isOn()) ? UPPER : LOWER), null);
+								} else if (shift.isOn()) {
+									result = new MapData(MapData.STRING, asMapData.keyData.get(LOWER_WITH_UPPER), null);
+								} else {
+									result = new MapData(MapData.STRING, asMapData.keyData.get(UPPER_WITH_LOWER), null);
+								}
+							}
+							if (result.keyData.get(0) != null) {
+								// In case of ; or ? which are also standalones.
+								recentHistory.getLast().mapData = result;
+								this.sendKeyEvents(e.getComponent(), e.getWhen(), result.keyData.get(0));
+							}
 						}
 					}
 				}
@@ -590,6 +610,9 @@ public class TextAreaBraille extends JTextArea {
 		}
 		for (Integer[] codes: GREEK.keySet()) {
 			addToBrailleMap(codes, MapData.ALPHABET, GREEK.get(codes)[LOWER], GREEK.get(codes)[UPPER]);
+			// Add to DIGIT and double SHIFT40 for completely unambiguous use.
+			addToBrailleMap(join(join(DIGIT), codes), MapData.ALPHABET, GREEK.get(codes)[LOWER], GREEK.get(codes)[UPPER]);
+			addToBrailleMap(join(join(SHIFT40), codes), MapData.ALPHABET, GREEK.get(codes)[LOWER], GREEK.get(codes)[UPPER]);
 		}
 		for (Integer[] codes: PHONETICS.keySet()) {
 			addToBrailleMap(codes, MapData.ALPHABET, PHONETICS.get(codes)[LOWER], PHONETICS.get(codes)[UPPER]);
@@ -1018,6 +1041,41 @@ public class TextAreaBraille extends JTextArea {
 
 				dict.put(code, pair);
 			}
+
+			// THE GREEK OVERRIDES
+			// Can't just add these to the wordsign dictionaries. Well, we could,
+			// but they'd need to be in every one of them.
+			for (Integer[] code: GREEK_OVERRIDES.keySet()) {
+				ArrayList<KeyData> lower = new ArrayList<KeyData>();
+				ArrayList<KeyData> upper = new ArrayList<KeyData>();
+				ArrayList<KeyData> upperWithLower = new ArrayList<KeyData>();
+				ArrayList<KeyData> subLower = new ArrayList<KeyData>();
+				ArrayList<KeyData> subUpper = new ArrayList<KeyData>();
+				String endSign = GREEK_OVERRIDES.get(code);
+				lower.add(charToKeyData.get(endSign.charAt(0)));
+				upper.add(charToKeyData.get(Character.toUpperCase(endSign.charAt(0))));
+				upperWithLower.add(charToKeyData.get(Character.toUpperCase(endSign.charAt(0))));
+				for (int c = 1; c < 4; c++) {
+					lower.add(charToKeyData.get(endSign.charAt(c)));
+					upper.add(charToKeyData.get(Character.toUpperCase(endSign.charAt(c))));
+					upperWithLower.add(charToKeyData.get(endSign.charAt(c)));
+				}
+				for (int i = 0; i < 4; i++) {
+					subLower.add(KD_BACKSPACE);
+					subUpper.add(KD_BACKSPACE);
+				}
+				log.info("PIN CODE SEQUENCE: " + new ArrayList<Integer>(Arrays.asList(code)).toString());
+				subLower.add(GREEK.get(code)[LOWER][0]);
+				subUpper.add(GREEK.get(code)[UPPER][0]);
+				MapData mdGreek = BRAILLE_MAP.get(code[0]).map.get(code[1]);
+				mdGreek.type = MapData.STRING | MapData.ALPHABET | MapData.WORDSIGN;
+				mdGreek.keyData.set(0, lower);
+				mdGreek.keyData.set(1, upper);
+				mdGreek.keyData.add(upperWithLower);
+				mdGreek.keyData.add(subLower);
+				mdGreek.keyData.add(subUpper);
+				log.info("MDGREEK: " + String.valueOf(mdGreek.keyData.get(SUB_LOWER).get(4).keyChar) + ", " + mdGreek.keyData.get(SUB_UPPER).get(4).keyChar);
+			}
 		}
 	}
 
@@ -1241,7 +1299,6 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer SHIFT56 = 56;
 	private static final Integer SHIFT = SHIFT32;
 	private static final Integer GRADE1 = SHIFT48;
-	private static final Integer[] QUALIFIERS = join(DIGIT, SHIFT8, SHIFT16, SHIFT24, SHIFT32, SHIFT40, SHIFT48, SHIFT56);
 
 	// PINCODES
 	// SPECIAL
@@ -1317,22 +1374,24 @@ public class TextAreaBraille extends JTextArea {
 		ALPHABET.put(Ax, link(KD_Ax, KD_AX));
 		ALPHABET.put(Ay, link(KD_Ay, KD_AY));
 		ALPHABET.put(Az, link(KD_Az, KD_AZ));
-		DIGITS.put(Aa, KD_Aa);
-		DIGITS.put(Ab, KD_Ab);
-		DIGITS.put(Ac, KD_Ac);
-		DIGITS.put(Ad, KD_Ad);
-		DIGITS.put(Ae, KD_Ae);
-		DIGITS.put(Af, KD_Af);
-		DIGITS.put(Ag, KD_Ag);
-		DIGITS.put(Ah, KD_Ah);
-		DIGITS.put(Ai, KD_Ai);
-		DIGITS.put(Aj, KD_Aj);
+		DIGITS.put(Aa, KD_1);
+		DIGITS.put(Ab, KD_2);
+		DIGITS.put(Ac, KD_3);
+		DIGITS.put(Ad, KD_4);
+		DIGITS.put(Ae, KD_5);
+		DIGITS.put(Af, KD_6);
+		DIGITS.put(Ag, KD_7);
+		DIGITS.put(Ah, KD_8);
+		DIGITS.put(Ai, KD_9);
+		DIGITS.put(Aj, KD_0);
 		DIGITS.put(SHIFT16, KD_SPACE);
 	}
 	private static final int LOWER = 0;
 	private static final int UPPER = 1;
 	private static final int UPPER_WITH_LOWER = 2;
-	private static final int LOWER_WITH_UPPER = 3; // NOt always possible.
+	private static final int LOWER_WITH_UPPER = 3; // Not always possible.
+	private static final int SUB_LOWER = 3;
+	private static final int SUB_UPPER = 4;
 	private static final int LEFT_CHAR = 0;
 	private static final int RIGHT_CHAR = 1;
 
@@ -1638,6 +1697,7 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer[] TILDE_COMB = join(SHIFT24, ER);
 	private static final Integer[] LIGATURE = join(SHIFT24, EXCLAMATION);
 	// SHIFT24 - CONTRACTIONS
+	private static final Integer[] SELF = join(SHIFT24, Af); // CUSTOM
 	private static final Integer[] UPON = join(SHIFT24, Au);
 	private static final Integer[] THESE = join(SHIFT24, THE);
 	private static final Integer[] THOSE = join(SHIFT24, TH);
@@ -1668,6 +1728,7 @@ public class TextAreaBraille extends JTextArea {
 		MODIFIERS.put(RING, join(KD_RING));
 		MODIFIERS.put(TILDE_COMB, join(KD_TILDE_COMB));
 		// GROUPSIGNS
+		GROUPSIGNS.put(SELF, "self"); // CUSTOM
 		GROUPSIGNS.put(UPON, "upon");
 		GROUPSIGNS.put(THESE, "these");
 		GROUPSIGNS.put(THOSE, "those");
@@ -1681,21 +1742,14 @@ public class TextAreaBraille extends JTextArea {
 	// SHIFT 40 - CONTRACTIONS
 	private static final Integer[] OUND = join(SHIFT40, Ad);
 	private static final Integer[] ANCE = join(SHIFT40, Ae);
-	private static final Integer[] SELF = join(SHIFT40, Af); // CUSTOM
 	private static final Integer[] SION = join(SHIFT40, An);
 	private static final Integer[] LESS = join(SHIFT40, As);
 	private static final Integer[] OUNT = join(SHIFT40, At);
+	private static final HashMap<Integer[], String> GREEK_OVERRIDES = new HashMap<Integer[], String>();
 	static {
 		CHARACTERS.put(PERCENT, KD_PERCENT);
 		CHARACTERS.put(UNDERSCORE, new KeyData('_', KeyEvent.VK_UNDERSCORE, true));
 		DIGITS.put(WAS, KD_PERCENT);
-		// CONTRACTIONS
-		GROUPSIGNS.put(OUND, "ound");
-		GROUPSIGNS.put(ANCE, "ance");
-		GROUPSIGNS.put(SELF, "self"); // CUSTOM
-		GROUPSIGNS.put(SION, "sion");
-		GROUPSIGNS.put(LESS, "less");
-		GROUPSIGNS.put(OUNT, "ount");
 	}
 
 	// SHIFT 48 (GRADE 1)
@@ -1802,6 +1856,12 @@ public class TextAreaBraille extends JTextArea {
 		GREEK.put(Gchi, link(KD_Gchi, KD_GCHI));
 		GREEK.put(Gpsi, link(KD_Gpsi, KD_GPSI));
 		GREEK.put(Gomega, link(KD_Gomega, KD_GOMEGA));
+		// For some reason UEB overloads 5 leters of the Greek alphabet with contractions.
+		GREEK_OVERRIDES.put(Gdelta, "ound");
+		GREEK_OVERRIDES.put(Gepsilon, "ance");
+		GREEK_OVERRIDES.put(Gnu, "sion");
+		GREEK_OVERRIDES.put(Gsigma, "less");
+		GREEK_OVERRIDES.put(Gtau, "ount");	
 	}
 
 	private static final HashMap<String, HashMap<Integer, MapData>> ALPHABETIC_WORDSIGNS =
@@ -1912,7 +1972,6 @@ public class TextAreaBraille extends JTextArea {
 	private static final HashMap<Integer, MapData> BRAILLE_MAP = new HashMap<Integer, MapData>();
 	static {
 		populateBrailleMap();
-		populateAlphabeticWordsignsAndGroupSigns();
 		addWhitespacesToBrailleMap();
 		addAlphabetsToBrailleMap();
 		addDigitsToBrailleMap();
@@ -1920,5 +1979,6 @@ public class TextAreaBraille extends JTextArea {
 		addCharsToBrailleMap();
 		addCombiningCharsToBrailleMap();
 		addLigaturesToBrailleMap();
+		populateAlphabeticWordsignsAndGroupSigns();
 	}
 }
