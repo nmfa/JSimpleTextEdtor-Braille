@@ -424,6 +424,12 @@ public class TextAreaBraille extends JTextArea {
 		MapData mdModifier = null;
 		MapData mdLigature = null;
 
+		// GRADE1 is actually SHIFT48
+		if (!recentHistory.getLast().mapData.isStandAloneMarker() &&
+			grade1.isOn() && currentPinCodesList.get(0) != SHIFT48) {
+				currentPinCodesList.add(0, SHIFT48);
+		}
+
 		MapData md = null;
 		while (pcIndex[0] < pinCodeCount) {
 			md = __getMapDataFromBrailleMap(pcIndex);
@@ -1522,10 +1528,6 @@ public class TextAreaBraille extends JTextArea {
 		LIGATURES.put(join(As, At), link(KD_Lst, null));
 		LIGATURES.put(join(Au, Ae), link(KD_Lue, null));
 	}
-
-	// NUMBERS
-	private static final Integer[] D_TEN = join(Aa, Ab, Ac, Ad, Ae, Af, Ag, Ah, Ai, Aj);
-	private static final KeyData[] KD_TEN = join(KD_1, KD_2, KD_3, KD_4, KD_5, KD_6, KD_7, KD_8, KD_9, KD_0);
 
 	// MUSIC
 	//private static final Integer[] NATURAL = join(DIGIT, CH); // No Arial char
