@@ -1090,11 +1090,6 @@ public class TextAreaBraille extends JTextArea {
 		// ENGLISH ALPHABET
 		addToBrailleMap(LIGATURE, MapData.LIGATURE | MapData.OVERFLOWS, KD_LIGATURE, null);
 
-		// NUMBERS
-		addCharToBrailleMap(join(DIGIT, EN), KD_CARET);
-		addCharToBrailleMap(join(DIGIT, GROUP_OPEN), KD_LESS_THAN);
-		addCharToBrailleMap(join(DIGIT, GROUP_CLOSE), KD_GREATER_THAN);
-
 		// ASCII CHARACTERS. Stored under the negative of their keycode.
         //addWhitespaceToBrailleMap(Integer.valueOf(-KeyEvent.VK_SPACE), KD_SPACE);
     	addCharToBrailleMap(BACKSPACE, KD_BACKSPACE);
@@ -1560,6 +1555,8 @@ public class TextAreaBraille extends JTextArea {
 		STANDALONES.put(ROUND_BRACKET_CLOSE, new KeyData(')', true));
 		STANDALONES.put(SQUARE_BRACKET_OPEN, new KeyData('['));
 		STANDALONES.put(SQUARE_BRACKET_CLOSE, new KeyData(']'));
+		DIGITS.put(GROUP_OPEN, KD_LESS_THAN);
+		DIGITS.put(GROUP_CLOSE, KD_GREATER_THAN);
 	}
 
 	// SHIFT 8
@@ -1592,6 +1589,7 @@ public class TextAreaBraille extends JTextArea {
 		CHARACTERS.put(AT_SIGN, KD_AT_SIGN);
 		CHARACTERS.put(CARET, KD_CARET);
 		CHARACTERS.put(TILDE, new KeyData('~', true));
+		DIGITS.put(EN, KD_CARET);
 		// CURRENCIES
 		CHARACTERS.put(CENT, new KeyData('¢'));
 		CHARACTERS.put(DOLLAR, new KeyData('$', KeyEvent.VK_DOLLAR, true));
