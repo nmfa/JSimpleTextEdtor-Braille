@@ -39,7 +39,9 @@ class MapData {
 	}
 
 	MapData(int tp, KeyData[] kdLower, KeyData[] kdUpper) {
-		this(tp, new ArrayList<KeyData>(Arrays.asList(kdLower)), new ArrayList<KeyData>(Arrays.asList(kdUpper)));
+		this(tp,
+			 new ArrayList<KeyData>(Arrays.asList(kdLower)),
+			 (kdUpper == null) ? null : new ArrayList<KeyData>(Arrays.asList(kdUpper)));
 	}
 
 	// Can't use List.of as arguments could be null.
@@ -520,6 +522,12 @@ public class TextAreaBraille extends JTextArea {
 					}
 					return result;
 				} // else // CHARACTER, STRING, none of which can't be modified.
+
+				// Terminal sigma.
+				if (md.isStandAloneMarker() &&
+					recentHistory.getLast().keyData.get(0) == KD_Gsigma) {
+						this.sendKeyEvents(e.getComponent(), e.getWhen(), MD_SIGMA_FINAL.keyData.get(0));
+				}
 
 				if (md.isStandAloneMarker() &&
 					recentHistory.getFirst().mapData.isStandAloneMarker() &&
@@ -1208,6 +1216,7 @@ public class TextAreaBraille extends JTextArea {
 	private static final KeyData KD_Grho = new KeyData('ρ');
 	//final KeyData KD_sigma = new KeyData('σ');
 	private static final KeyData KD_Gsigma = new KeyData('σ');
+	private static final KeyData KD_Gsigma_FINAL = new KeyData('ς');
 	//private static final KeyData KD_join(WHITESPACE = Gsigma) = KD_sigma); // To prevent the nexy firing when just the letter σ.
 	//private static final KeyData KD_join(Gsigma = WHITESPACE) = KD_BACKSPACE = new KeyData('ς') = KD_WHITESPACE); // Sigma at the end of a word.
 	private static final KeyData KD_Gtau = new KeyData('τ');
@@ -1830,6 +1839,7 @@ public class TextAreaBraille extends JTextArea {
 	private static final Integer[] Gchi = join(SHIFT40, AND);
 	private static final Integer[] Gpsi = join(SHIFT40, Ay);
 	private static final Integer[] Gomega = join(SHIFT40, Aw);
+	private static final MapData MD_SIGMA_FINAL = new MapData(MapData.STRING, join(KD_BACKSPACE, KD_Gsigma_FINAL), null);
 	private static final HashMap<Integer[], KeyData[][]> GREEK = new HashMap<Integer[], KeyData[][]>();
 	static {
 		GREEK.put(Galpha, link(KD_Galpha, KD_GALPHA));
